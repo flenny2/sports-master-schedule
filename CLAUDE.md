@@ -30,6 +30,10 @@ Server runs on http://localhost:5000 with debug/auto-reload enabled.
 - NBA: only playoff and play-in games are shown — regular season is completely excluded
 - Availability is simple: Mon-Fri 8am-6pm PT = unavailable, everything else = available
 - Title races are configured in config.py TITLE_RACES and rendered as a widget above standings
+- Month view fetches ~35 days of data — first load is slow (many per-day API calls), cache makes subsequent loads fast
+- Desktop renders `calendar-grid` (month grid with dots), mobile renders `mobile-calendar` (2-week vertical list with inline cards) — same DOM element, JS switches the className
+- User data (watched, notes) stored in `data/userdata.json` — not gitignored contents, but the directory is needed at runtime
+- Interactive elements inside game cards (watched button, notes textarea) must call `stopPropagation()` to prevent toggling the card's expand/collapse
 
 ## ESPN API Gotchas
 - Team schedule endpoint (`/teams/{id}/schedule`) only returns PAST games — use scoreboard-by-date + league calendar for future fixtures
@@ -38,11 +42,15 @@ Server runs on http://localhost:5000 with debug/auto-reload enabled.
 - Score values for soccer come back as floats ("2.0") — must cast via `int(float(val))`
 - NBA season_type: 2=regular, 3=playoffs, 5=play-in
 - The `note` field on standings entries contains zone info (Champions League, Relegation, etc.)
+- Broadcaster names are truncated ("USA Net", "Tele") — cleaned via `BROADCAST_DISPLAY` mapping in `espn.py`
+- Competitor records (`records[].summary`) must be extracted per-team from the competitor object, not the event
 
 ## Code Style
 - Beginner-friendly: clear variable names, comments on non-obvious logic
 - No unnecessary abstractions
 - Frontend uses safe DOM methods (createElement/textContent) — no innerHTML (security hook blocks it)
+- Frontend uses `var` (not `let`/`const`) and function declarations — keep consistent
+- `el(tag, cls, txt)` helper builds all DOM nodes; `appendIf(parent, child)` for nullable nodes like logos
 - Google Fonts (Barlow Condensed) loaded via CDN for broadcast-style typography
 
 ## Project Layout
