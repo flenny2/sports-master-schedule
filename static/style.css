@@ -1,0 +1,1381 @@
+/* ═══════════════════════════════════════════════════════════════
+   SPORTS SCHEDULE — Broadcast-inspired dark UI
+   ═══════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Tokens ───────────────────────────────────────────────────── */
+:root {
+    --font-display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+    --font-body:    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+    /* Surfaces — deep navy, not flat black */
+    --bg:         #080b12;
+    --surface-1:  #0f1319;
+    --surface-2:  #161c26;
+    --surface-3:  #1e2635;
+    --surface-4:  #263044;
+    --border:     #1e2635;
+    --border-hl:  #2d3a4e;
+
+    /* Text */
+    --text:       #dfe4ea;
+    --text-2:     #7e8a9a;
+    --text-3:     #4a5568;
+
+    /* Accent — warm broadcast gold */
+    --gold:       #d4a332;
+    --gold-dim:   rgba(212, 163, 50, 0.10);
+    --gold-mid:   rgba(212, 163, 50, 0.25);
+
+    /* Tiers */
+    --must-watch:  #ef4444;
+    --notable:     #d4a332;
+    --major-event: #8b5cf6;
+
+    /* Availability — distinct from sport/tier colors */
+    --can-watch:   #38bdf8;
+    --will-miss:   #94a3b8;
+
+    /* Sports */
+    --soccer:      #22c55e;
+    --basketball:  #f97316;
+    --football:    #3b82f6;
+
+    --radius: 6px;
+    --ease:   cubic-bezier(.22, .61, .36, 1);
+}
+
+body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+}
+
+.hidden { display: none !important; }
+
+/* ── Header ───────────────────────────────────────────────────── */
+header {
+    background: var(--surface-1);
+    padding: 0.7rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.brand {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: 0.12em;
+    color: var(--gold);
+    user-select: none;
+}
+
+/* Gold accent stripe below header — broadcast chyron vibe */
+.header-accent {
+    height: 2px;
+    background: linear-gradient(90deg, var(--gold) 0%, transparent 70%);
+    position: sticky;
+    top: 44px;     /* header height */
+    z-index: 99;
+}
+
+/* Week navigator */
+.week-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.15rem;
+}
+
+#week-label {
+    min-width: 130px;
+    text-align: center;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.04em;
+    padding: 0 0.15rem;
+    user-select: none;
+}
+
+.nav-arrow {
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.3rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s var(--ease);
+}
+.nav-arrow:hover { background: var(--surface-3); color: var(--text); }
+.nav-arrow:disabled { opacity: 0.25; cursor: default; }
+.nav-arrow:disabled:hover { background: transparent; color: var(--text-2); }
+
+/* Refresh button */
+.refresh-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    padding: 0.3rem 0.65rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.15s var(--ease);
+}
+.refresh-btn:hover { border-color: var(--gold); color: var(--gold); }
+.refresh-icon { width: 14px; height: 14px; }
+
+/* ── Tab bar ──────────────────────────────────────────────────── */
+.tab-bar {
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.view-tabs { display: flex; }
+
+.tab {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    padding: 0.6rem 0.85rem;
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.12s var(--ease);
+}
+.tab:hover { color: var(--text-2); }
+.tab.active {
+    color: var(--gold);
+    border-bottom-color: var(--gold);
+}
+
+.sport-filters {
+    display: flex;
+    gap: 0.3rem;
+    padding: 0.45rem 0;
+}
+
+.pill {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    padding: 0.2rem 0.6rem;
+    border-radius: 100px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s var(--ease);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.pill:hover { color: var(--text-2); border-color: var(--border-hl); }
+.pill.active { background: var(--gold-dim); border-color: var(--gold); color: var(--gold); }
+
+.pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+.pill-dot.soccer     { background: var(--soccer); }
+.pill-dot.basketball { background: var(--basketball); }
+.pill-dot.football   { background: var(--football); }
+
+/* Sport-specific active pill colors */
+.pill[data-sport="soccer"].active {
+    background: rgba(34, 197, 94, 0.10);
+    border-color: var(--soccer);
+    color: var(--soccer);
+}
+.pill[data-sport="basketball"].active {
+    background: rgba(249, 115, 22, 0.10);
+    border-color: var(--basketball);
+    color: var(--basketball);
+}
+.pill[data-sport="football"].active {
+    background: rgba(59, 130, 246, 0.10);
+    border-color: var(--football);
+    color: var(--football);
+}
+
+/* ── Main ─────────────────────────────────────────────────────── */
+main {
+    flex: 1;
+    padding: 1rem 1.25rem;
+    max-width: 1120px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.status-message {
+    text-align: center;
+    color: var(--text-2);
+    padding: 3rem 1rem;
+    font-size: 0.9rem;
+}
+.status-message .hint {
+    font-size: 0.78rem;
+    margin-top: 0.35rem;
+    color: var(--text-3);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CALENDAR — Month Grid (Desktop)
+   ═══════════════════════════════════════════════════════════════ */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.day-header {
+    background: var(--surface-2);
+    padding: 0.4rem;
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+}
+
+.day-cell {
+    background: var(--surface-1);
+    min-height: 80px;
+    padding: 0.35rem;
+    cursor: pointer;
+    transition: background 0.12s var(--ease);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+.day-cell:hover { background: var(--surface-2); }
+.day-cell.selected { background: var(--surface-2); }
+
+/* Selected day: gold indicator bar */
+.day-cell.selected::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--gold);
+}
+
+/* Days outside current month */
+.day-cell.outside { opacity: 0.3; }
+
+/* Brighter date number when games exist */
+.day-cell.has-games .dc-num { color: var(--text); }
+
+.dc-num {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-3);
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 50%;
+    transition: all 0.15s var(--ease);
+}
+
+/* Today: gold circle */
+.day-cell.is-today .dc-num {
+    background: var(--gold);
+    color: var(--bg);
+}
+
+/* Game indicator dots */
+.dc-indicators {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+    margin-top: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.dc-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+.dc-dot.soccer     { background: var(--soccer); }
+.dc-dot.basketball { background: var(--basketball); }
+.dc-dot.football   { background: var(--football); }
+.dc-dot.dimmed     { opacity: 0.35; }
+
+.dc-dot-more {
+    font-size: 0.5rem;
+    color: var(--text-3);
+    line-height: 1;
+}
+
+.dc-count {
+    font-size: 0.5rem;
+    font-weight: 500;
+    color: var(--text-3);
+    margin-top: 0.15rem;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DETAIL PANEL (below calendar)
+   ═══════════════════════════════════════════════════════════════ */
+.detail-panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.detail-panel.empty {
+    border-color: transparent;
+    background: transparent;
+}
+
+.dp-head {
+    padding: 0.7rem 1rem;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+}
+
+.dp-date {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.dp-today {
+    color: var(--gold);
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.dp-count {
+    font-size: 0.75rem;
+    color: var(--text-3);
+}
+
+.dp-games {
+    padding: 0.5rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.dp-empty {
+    text-align: center;
+    color: var(--text-3);
+    padding: 2rem;
+    font-style: italic;
+    font-size: 0.85rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GAME CARDS
+   ═══════════════════════════════════════════════════════════════ */
+.game-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.15s var(--ease);
+    border-left: 3px solid transparent;
+}
+.game-card:hover {
+    border-color: var(--border-hl);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+/* Sport-colored left edge */
+.game-card.sport-soccer     { border-left-color: var(--soccer); }
+.game-card.sport-basketball { border-left-color: var(--basketball); }
+.game-card.sport-football   { border-left-color: var(--football); }
+
+/* Post-game dimming — finished games recede */
+.game-card--post {
+    opacity: 0.5;
+}
+.game-card--post:hover {
+    opacity: 0.8;
+}
+
+/* ── Pre-game layout (upcoming) ───────────────────────────────── */
+.gc-main {
+    padding: 0.6rem 0.85rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    gap: 0.75rem;
+}
+
+.gc-matchup {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.35;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+}
+
+.gc-matchup .vs {
+    color: var(--text-3);
+    font-weight: 500;
+    margin: 0 0.1rem;
+}
+
+/* Team records line (below matchup) */
+.gc-records {
+    font-size: 0.68rem;
+    color: var(--text-3);
+    padding-top: 0.15rem;
+}
+
+.gc-rec-sep {
+    color: var(--text-3);
+}
+
+/* ── Scoreboard layout (finished / live games) ────────────────── */
+.gc-scoreboard {
+    padding: 0.55rem 0.85rem 0.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+}
+
+.sb-team {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-2);
+    min-width: 0;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.sb-team.away { justify-content: flex-end; }
+.sb-team.home { justify-content: flex-start; }
+
+.sb-score {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.sb-score .sb-dash {
+    color: var(--text-3);
+    font-size: 1rem;
+}
+
+.sb-status {
+    text-align: center;
+    padding-bottom: 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.sb-status.live {
+    color: var(--must-watch);
+    animation: pulse 1.8s infinite;
+}
+
+.sb-status.final {
+    color: var(--text-3);
+}
+
+/* ── Meta row (shared across layouts) ─────────────────────────── */
+.gc-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    padding: 0 0.85rem 0.55rem;
+    font-size: 0.72rem;
+}
+
+.tier {
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+}
+.tier.must-watch  { background: var(--must-watch); color: #fff; }
+.tier.notable     { background: var(--notable); color: var(--bg); }
+.tier.major-event { background: var(--major-event); color: #fff; }
+
+.gc-league {
+    color: var(--text-2);
+    font-weight: 500;
+}
+
+.gc-sep {
+    color: var(--text-3);
+    font-size: 0.5rem;
+}
+
+.gc-avail {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.gc-avail.can-watch  { color: var(--can-watch); }
+.gc-avail.will-miss  { color: var(--will-miss); }
+
+.gc-avail-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+}
+.gc-avail.can-watch .gc-avail-dot { background: var(--can-watch); }
+.gc-avail.will-miss .gc-avail-dot { background: var(--will-miss); }
+
+/* ── Time column (pre-game only) ──────────────────────────────── */
+.gc-time {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.gc-time .t {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Expanded detail ──────────────────────────────────────────── */
+.gc-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s var(--ease), opacity 0.2s;
+    opacity: 0;
+}
+.game-card.expanded .gc-detail {
+    max-height: 300px;
+    opacity: 1;
+}
+
+.gc-detail-inner {
+    padding: 0.55rem 0.85rem 0.65rem;
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.35rem 1.5rem;
+    font-size: 0.72rem;
+}
+
+.gd-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+}
+
+.gd-label {
+    font-family: var(--font-display);
+    font-size: 0.58rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-3);
+}
+
+.gd-val {
+    color: var(--text-2);
+}
+
+.gd-val.accent {
+    color: var(--gold);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TODAY VIEW — Command Center
+   ═══════════════════════════════════════════════════════════════ */
+#today-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.today-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.today-head .th-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+}
+
+.today-head .th-text {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+/* Sections: Live Now, Coming Up, Completed */
+.today-section {
+    margin-bottom: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.today-section-label {
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--must-watch);
+    animation: pulse 1.8s infinite;
+}
+
+/* Countdown on upcoming cards */
+.card-countdown {
+    padding: 0.15rem 0.85rem 0.25rem;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.02em;
+}
+
+/* Empty state: no games today */
+.today-empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+}
+
+.today-empty-msg {
+    color: var(--text-3);
+    font-style: italic;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Next upcoming game card */
+.today-next-up {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    display: inline-block;
+}
+
+.today-next-label {
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-3);
+    margin-bottom: 0.5rem;
+}
+
+.today-next-game {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.today-next-game .vs {
+    color: var(--text-3);
+    font-weight: 500;
+}
+
+.today-next-meta {
+    font-size: 0.75rem;
+    color: var(--text-2);
+    margin-top: 0.35rem;
+}
+
+/* ── Footer ───────────────────────────────────────────────────── */
+footer {
+    background: var(--surface-1);
+    border-top: 1px solid var(--border);
+    padding: 0.5rem 1.25rem;
+    text-align: center;
+}
+
+.legend {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: 0.65rem;
+    color: var(--text-3);
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.ldot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+.ldot.must-watch  { background: var(--must-watch); }
+.ldot.notable     { background: var(--notable); }
+.ldot.major-event { background: var(--major-event); }
+.ldot.can-watch   { background: var(--can-watch); }
+.ldot.will-miss   { background: var(--will-miss); }
+
+.lsep {
+    width: 1px;
+    height: 10px;
+    background: var(--border);
+}
+
+.footnote {
+    font-size: 0.58rem;
+    color: var(--text-3);
+    margin-top: 0.25rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABLES / STANDINGS VIEW
+   ═══════════════════════════════════════════════════════════════ */
+#tables-view {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+/* League section */
+.tbl-section {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.tbl-section-head {
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: background 0.12s var(--ease);
+}
+.tbl-section-head:hover { background: var(--surface-2); }
+
+.tbl-league-name {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.tbl-toggle {
+    color: var(--text-3);
+    font-size: 0.8rem;
+    transition: transform 0.2s var(--ease);
+}
+.tbl-section.collapsed .tbl-toggle { transform: rotate(-90deg); }
+.tbl-section.collapsed .tbl-section-body { display: none; }
+
+/* Group name (e.g. "Eastern Conference") */
+.tbl-group-name {
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    padding: 0.5rem 0.85rem 0.25rem;
+}
+
+/* The actual standings table */
+.standings-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.standings-table th {
+    font-family: var(--font-display);
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+    padding: 0.35rem 0.5rem;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--surface-1);
+}
+
+.standings-table th:first-child,
+.standings-table th:nth-child(2) {
+    text-align: left;
+}
+
+.standings-table td {
+    padding: 0.4rem 0.5rem;
+    text-align: right;
+    color: var(--text-2);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+}
+
+.standings-table td:first-child {
+    text-align: center;
+    width: 2rem;
+    color: var(--text-3);
+    font-weight: 600;
+}
+
+.standings-table td:nth-child(2) {
+    text-align: left;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.standings-table tr:last-child td {
+    border-bottom: none;
+}
+
+.standings-table tbody tr:hover td {
+    background: var(--surface-2);
+}
+
+/* Watched team highlight — gold accent */
+.standings-table tr.watched td {
+    background: var(--gold-dim);
+}
+.standings-table tr.watched:hover td {
+    background: var(--gold-mid);
+}
+.standings-table tr.watched td:nth-child(2) {
+    color: var(--gold);
+    font-weight: 700;
+}
+
+/* Top-6 PL team — subtle highlight */
+.standings-table tr.top6 td:nth-child(2) {
+    font-weight: 600;
+}
+
+/* Zone indicators — left border stripe on rank cell */
+.standings-table td.zone-ucl {
+    box-shadow: inset 3px 0 0 var(--soccer);
+}
+.standings-table td.zone-uel {
+    box-shadow: inset 3px 0 0 var(--basketball);
+}
+.standings-table td.zone-rel {
+    box-shadow: inset 3px 0 0 var(--must-watch);
+}
+.standings-table td.zone-uecl {
+    box-shadow: inset 3px 0 0 #58a6ff;
+}
+
+/* NBA-specific: play-in zone, eliminated */
+.standings-table td.zone-playoff {
+    box-shadow: inset 3px 0 0 var(--soccer);
+}
+.standings-table td.zone-playin {
+    box-shadow: inset 3px 0 0 var(--notable);
+}
+.standings-table td.zone-elim {
+    box-shadow: inset 3px 0 0 var(--must-watch);
+}
+
+/* Clincher badge */
+.clinch {
+    font-size: 0.58rem;
+    font-weight: 700;
+    margin-left: 0.3rem;
+    padding: 0 0.25rem;
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.clinch.clinch-x { color: var(--soccer); }
+.clinch.clinch-y { color: var(--soccer); }
+.clinch.clinch-z { color: var(--gold); }
+.clinch.clinch-pb { color: var(--notable); }
+.clinch.clinch-e { color: var(--must-watch); }
+
+/* Points column bold for soccer */
+.standings-table td.pts-col {
+    color: var(--text);
+    font-weight: 700;
+}
+
+/* Win pct for NBA */
+.standings-table td.pct-col {
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* Streak colors — explicit, not tied to availability vars */
+.streak-w { color: #22c55e; }
+.streak-l { color: #ef4444; }
+
+/* Zone legend at bottom of table */
+.tbl-zone-legend {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.62rem;
+    color: var(--text-3);
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.tbl-zone-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.tbl-zone-legend-item .zl-bar {
+    width: 3px;
+    height: 10px;
+    border-radius: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TITLE RACE WIDGET
+   ═══════════════════════════════════════════════════════════════ */
+.race-widget {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    border-top: 2px solid var(--gold);
+}
+
+.race-head {
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.race-label {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--gold);
+}
+
+.race-gap {
+    font-size: 0.72rem;
+    color: var(--text-2);
+}
+
+.race-body {
+    padding: 0.5rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.race-row {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.6rem 0.75rem;
+}
+
+.race-row.race-leader {
+    border-color: var(--gold);
+    background: var(--gold-dim);
+}
+
+.race-team {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.45rem;
+}
+
+.race-rank {
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-3);
+}
+
+.race-name {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.race-row.race-leader .race-name {
+    color: var(--gold);
+}
+
+/* Stats row */
+.race-stats {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.4rem;
+}
+
+.race-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 2.5rem;
+}
+
+.race-stat-val {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+.race-stat-label {
+    font-size: 0.55rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+}
+
+/* Upcoming fixtures strip */
+.race-fixtures {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.race-fix-label {
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-3);
+    margin-right: 0.15rem;
+}
+
+.race-fix {
+    font-size: 0.65rem;
+    font-weight: 500;
+    color: var(--text-2);
+    background: var(--surface-3);
+    padding: 0.15rem 0.35rem;
+    border-radius: 3px;
+    white-space: nowrap;
+    cursor: default;
+}
+
+.race-row.race-leader .race-fix {
+    background: var(--surface-3);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE CALENDAR — 2-week vertical list
+   ═══════════════════════════════════════════════════════════════ */
+.mobile-calendar {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: transparent;
+    border-radius: 0;
+    overflow: visible;
+}
+
+.mobile-day {
+    border-bottom: 1px solid var(--border);
+}
+
+.mobile-day.is-today {
+    background: var(--surface-1);
+    border-left: 3px solid var(--gold);
+}
+
+.mobile-day-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.85rem;
+}
+
+.mobile-day-name {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+}
+
+.mobile-today-badge {
+    color: var(--gold);
+    font-size: 0.72rem;
+    font-weight: 500;
+    margin-left: 0.4rem;
+    letter-spacing: 0;
+    font-family: var(--font-body);
+}
+
+.mobile-day-count {
+    font-size: 0.68rem;
+    color: var(--text-3);
+}
+
+.mobile-day-games {
+    padding: 0 0.65rem 0.55rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.mobile-day-off {
+    padding: 0 0.85rem 0.55rem;
+    font-size: 0.72rem;
+    color: var(--text-3);
+    font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TEAM LOGOS
+   ═══════════════════════════════════════════════════════════════ */
+.team-logo {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    vertical-align: middle;
+    flex-shrink: 0;
+    display: inline-block;
+}
+
+/* Sizing in different contexts */
+.sb-team .team-logo         { width: 22px; height: 22px; }
+.gc-matchup .team-logo      { width: 18px; height: 18px; }
+.standings-table .team-logo  { width: 16px; height: 16px; margin-right: 0.3rem; }
+.race-team .team-logo        { width: 22px; height: 22px; }
+.today-next-game .team-logo  { width: 22px; height: 22px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   BROADCASTS, WATCHED, NOTES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Broadcast channels on card */
+.gc-broadcast {
+    font-size: 0.65rem;
+    color: var(--text-3);
+}
+
+/* Upcoming cards: broadcasts slightly brighter */
+.gc-main .gc-broadcast {
+    color: var(--text-2);
+    margin-top: 0.1rem;
+}
+
+/* Watched toggle button */
+.gc-watched {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.12rem 0.4rem;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    transition: all 0.12s var(--ease);
+    line-height: 1.5;
+}
+.gc-watched:hover {
+    border-color: var(--can-watch);
+    color: var(--can-watch);
+}
+.gc-watched.is-watched {
+    border-color: var(--can-watch);
+    color: var(--can-watch);
+    background: rgba(56, 189, 248, 0.1);
+}
+
+/* Watched finished games: slightly more visible than unwatched */
+.game-card--post.game-card--watched {
+    opacity: 0.65;
+}
+
+/* Notes textarea in expanded detail */
+.gd-notes-row {
+    grid-column: 1 / -1;
+}
+
+.gc-notes {
+    width: 100%;
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    padding: 0.35rem 0.5rem;
+    resize: vertical;
+    min-height: 2.5rem;
+    max-height: 6rem;
+    margin-top: 0.2rem;
+}
+.gc-notes::placeholder {
+    color: var(--text-3);
+}
+.gc-notes:focus {
+    outline: none;
+    border-color: var(--gold);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+    .gc-detail-inner { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+    header { flex-wrap: wrap; gap: 0.5rem; }
+    .brand { width: 100%; text-align: center; }
+    .week-nav { flex: 1; justify-content: center; }
+
+    .tab-bar {
+        flex-direction: column;
+        gap: 0;
+        padding: 0;
+    }
+    .view-tabs { justify-content: center; }
+    .sport-filters {
+        justify-content: center;
+        padding: 0.35rem 0.75rem;
+        border-top: 1px solid var(--border);
+    }
+
+    /* Desktop grid hidden on mobile — JS renders mobile-calendar instead */
+    .calendar-grid { display: none; }
+
+    .gc-main { grid-template-columns: 1fr; gap: 0.2rem; }
+    .gc-time { text-align: left; }
+    .sb-score { font-size: 1.3rem; }
+
+    /* Tables: hide less important columns on mobile */
+    .standings-table .hide-mobile { display: none; }
+    .standings-table { font-size: 0.7rem; }
+    .standings-table th, .standings-table td { padding: 0.3rem 0.35rem; }
+}
