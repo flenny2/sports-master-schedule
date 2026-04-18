@@ -237,8 +237,10 @@ document.querySelectorAll(".tab").forEach(function(t) {
     t.addEventListener("click", function() {
         document.querySelectorAll(".tab").forEach(function(x) {
             x.classList.remove("active");
+            x.removeAttribute("aria-current");
         });
         t.classList.add("active");
+        t.setAttribute("aria-current", "page");
         currentView = t.dataset.view;
         render();
     });
@@ -248,8 +250,10 @@ document.querySelectorAll(".pill").forEach(function(b) {
     b.addEventListener("click", function() {
         document.querySelectorAll(".pill").forEach(function(x) {
             x.classList.remove("active");
+            x.setAttribute("aria-pressed", "false");
         });
         b.classList.add("active");
+        b.setAttribute("aria-pressed", "true");
         currentSport = b.dataset.sport;
         render();
     });
@@ -263,6 +267,45 @@ window.addEventListener("resize", function() {
     }
     lastMobileState = mobile;
 });
+
+// ── Swipe-to-navigate months (mobile Calendar view) ─────────────
+// Horizontal swipe on the calendar view triggers prev/next month, the
+// same as tapping the nav arrows. Only active on mobile and only on
+// the Calendar view so the Today / Playoffs / Tables views can scroll
+// without triggering navigation.
+(function attachSwipeNav() {
+    var SWIPE_THRESHOLD_PX = 60;     // must travel at least this far
+    var SWIPE_MAX_VERTICAL = 40;     // reject if it looks like a scroll
+    var SWIPE_MAX_DURATION_MS = 500; // fling, not a drag
+
+    var startX = 0, startY = 0, startT = 0, tracking = false;
+
+    function onStart(e) {
+        if (!isMobile() || currentView !== "week") return;
+        var t = e.touches ? e.touches[0] : e;
+        startX = t.clientX;
+        startY = t.clientY;
+        startT = Date.now();
+        tracking = true;
+    }
+    function onEnd(e) {
+        if (!tracking) return;
+        tracking = false;
+        var t = (e.changedTouches && e.changedTouches[0]) || e;
+        var dx = t.clientX - startX;
+        var dy = t.clientY - startY;
+        var dt = Date.now() - startT;
+        if (dt > SWIPE_MAX_DURATION_MS) return;
+        if (Math.abs(dy) > SWIPE_MAX_VERTICAL) return;
+        if (Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+        if (dx < 0) btnNext.click();
+        else        btnPrev.click();
+    }
+
+    // Attach to the week view (calendar area only).
+    weekView.addEventListener("touchstart", onStart, { passive: true });
+    weekView.addEventListener("touchend", onEnd, { passive: true });
+})();
 
 // ── Data ─────────────────────────────────────────────────────────
 
@@ -1306,11 +1349,15 @@ function buildLeagueSection(league) {
             body.appendChild(el("div", "tbl-group-name", group.name));
         }
 
+        // Wrap each table so it can scroll horizontally on narrow
+        // screens without forcing the page to scroll sideways.
+        var scroll = el("div", "tbl-scroll");
         if (league.sport === "soccer") {
-            body.appendChild(buildSoccerTable(group, league.id));
+            scroll.appendChild(buildSoccerTable(group, league.id));
         } else {
-            body.appendChild(buildNbaTable(group));
+            scroll.appendChild(buildNbaTable(group));
         }
+        body.appendChild(scroll);
     });
 
     // Zone legend

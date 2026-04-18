@@ -1,0 +1,19 @@
+{
+  "name": "Sports Master Schedule",
+  "short_name": "Sports",
+  "description": "Personal sports schedule — NFL primetime, NBA playoffs, Man City, major events.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080b12",
+  "theme_color": "#0f1319",
+  "icons": [
+    {
+      "src": "/static/apple-touch-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
