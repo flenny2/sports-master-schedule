@@ -15,50 +15,29 @@ def tag_importance(games):
     Set the 'tier' field on each game based on sport-specific rules.
     Modifies games in place and returns them.
     """
-    # Build lookup sets for fast matching
     must_watch_team_ids = {
         t["espn_id"]
         for t in config.WATCHED_TEAMS
         if t["tier"] == "must_watch"
     }
-    notable_team_ids = {
-        t["espn_id"]
-        for t in config.WATCHED_TEAMS
-        if t["tier"] == "notable"
-    }
-    top_pl_ids = set(config.PL_TOP_TEAMS.keys())
 
     for game in games:
         sport = game["sport"]
-        home_id = game["home_team"]["id"]
-        away_id = game["away_team"]["id"]
-        team_ids = {home_id, away_id}
+        team_ids = {game["home_team"]["id"], game["away_team"]["id"]}
 
         # ── NFL ───────────────────────────────────────────────
+        # Every NFL game we fetch is either primetime or a RedZone
+        # window game — both are must-watch.
         if sport == "football":
-            slot = game.get("nfl_slot", "")
-            if "Primetime" in slot:
-                game["tier"] = "must_watch"
-            else:
-                # RedZone window games
-                game["tier"] = "must_watch"
+            game["tier"] = "must_watch"
 
         # ── Soccer ────────────────────────────────────────────
+        # Only a must-watch team on the pitch upgrades the tier;
+        # every other soccer fixture we fetch (UCL, notable teams,
+        # top-6 PL matchups) is "notable".
         elif sport == "soccer":
-            league = game["league"]
-
-            # Must-watch teams (Man City)
             if team_ids & must_watch_team_ids:
                 game["tier"] = "must_watch"
-            # Champions League is always at least notable
-            elif league == "uefa.champions":
-                game["tier"] = "notable"
-            # Notable teams (Real Madrid, Barcelona)
-            elif team_ids & notable_team_ids:
-                game["tier"] = "notable"
-            # Two top-6 PL teams playing each other
-            elif league == "eng.1" and len(team_ids & top_pl_ids) == 2:
-                game["tier"] = "notable"
             else:
                 game["tier"] = "notable"
 

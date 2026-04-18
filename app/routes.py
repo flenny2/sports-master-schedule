@@ -64,8 +64,15 @@ def api_schedule():
     # Month-based range (e.g. ?month=2026-04) or legacy week param
     month_param = request.args.get("month")
     if month_param:
-        parts = month_param.split("-")
-        year, month = int(parts[0]), int(parts[1])
+        try:
+            year_str, month_str = month_param.split("-", 1)
+            year, month = int(year_str), int(month_str)
+            if not (1 <= month <= 12) or not (1900 <= year <= 2999):
+                raise ValueError("out of range")
+        except (ValueError, IndexError):
+            return jsonify({
+                "error": "invalid month — use YYYY-MM (e.g. 2026-04)",
+            }), 400
         start_date, end_date = _get_month_range(year, month)
     else:
         week_param = request.args.get("week", "this")

@@ -247,18 +247,14 @@ def fetch_team_schedule(sport, league_slug, team_id):
     return games
 
 
-def fetch_scoreboard(sport, league_slug, date_str=None, extra_params=None):
+def fetch_scoreboard(sport, league_slug, date_str=None):
     """
     Fetch the scoreboard for a sport/league.
     date_str format: "YYYYMMDD" (optional, for day-specific results).
     Returns a list of parsed game dicts.
     """
     url = f"{BASE_URL}/{sport}/{league_slug}/scoreboard"
-    params = {}
-    if date_str:
-        params["dates"] = date_str
-    if extra_params:
-        params.update(extra_params)
+    params = {"dates": date_str} if date_str else None
 
     data = _cached_get(url, params)
     if not data:
@@ -403,7 +399,7 @@ def fetch_nba_games(start_date, end_date):
         )
 
         if is_postseason or has_playoff_notes:
-            game["is_playoff"] = True
+            # is_playoff itself is set later by app.playoff.tag_playoff
             seen_ids.add(game["id"])
             games.append(game)
 
