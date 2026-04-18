@@ -1,14 +1,26 @@
 """
 User data persistence — watched flags and personal notes per game.
-Stored as a simple JSON file in data/userdata.json.
+Stored as a simple JSON file under DATA_DIR/userdata.json.
+
+The data directory is configurable via the DATA_DIR env var so the
+same code works both for local dev (./data) and for a production host
+with a persistent disk mounted elsewhere (e.g. Render Disk at
+/var/data). On a platform with an ephemeral filesystem the file will
+be rebuilt empty on every restart — that's expected.
 """
 
 import json
 import os
 
-DATA_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "userdata.json"
-)
+
+def _resolve_data_dir():
+    env_dir = os.environ.get("DATA_DIR")
+    if env_dir:
+        return env_dir
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+
+
+DATA_FILE = os.path.join(_resolve_data_dir(), "userdata.json")
 
 
 def _load():

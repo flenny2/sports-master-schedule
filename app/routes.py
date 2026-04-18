@@ -3,8 +3,11 @@ Flask routes — serves the dashboard page and the schedule API.
 """
 
 import calendar
+import os
 from datetime import date, timedelta
-from flask import Blueprint, render_template, jsonify, request
+from flask import (
+    Blueprint, render_template, jsonify, request, make_response,
+)
 
 from app.espn import get_all_games, get_all_standings, get_title_races, clear_cache
 from app.importance import tag_importance
@@ -13,6 +16,20 @@ from app.playoff import tag_playoff
 from app.userdata import get_all_userdata, set_watched, set_notes
 
 main = Blueprint("main", __name__)
+
+# Optional write-auth token. When SCHEDULE_TOKEN is set, POST endpoints
+# require a matching cookie. Read endpoints stay public.
+# Flow: user hits /?token=<value> once; the server sets a long-lived
+# cookie and redirects. Subsequent POSTs are accepted.
+# If the env var isn't set, writes are open (fine for local dev).
+_WRITE_TOKEN = os.environ.get("SCHEDULE_TOKEN", "").strip()
+_TOKEN_COOKIE = "schedule_token"
+
+
+def _write_allowed():
+    if not _WRITE_TOKEN:
+        return True
+    return request.cookies.get(_TOKEN_COOKIE) == _WRITE_TOKEN
 
 
 def _get_week_range(offset=0):
@@ -44,8 +61,26 @@ def _get_month_range(year, month):
 
 @main.route("/")
 def dashboard():
-    """Serve the main dashboard page."""
-    return render_template("index.html")
+    """
+    Serve the main dashboard page.
+
+    If SCHEDULE_TOKEN is configured and the request carries a matching
+    ?token=<value>, remember it in a cookie so future POSTs are
+    authenticated without the token in the URL.
+    """
+    resp = make_response(render_template("index.html"))
+    if _WRITE_TOKEN:
+        provided = request.args.get("token", "").strip()
+        if provided == _WRITE_TOKEN:
+            # 1-year, SameSite=Lax, HttpOnly. Secure when served over HTTPS.
+            resp.set_cookie(
+                _TOKEN_COOKIE, provided,
+                max_age=365 * 24 * 3600,
+                httponly=False,  # readable by JS (useful for client checks)
+                samesite="Lax",
+                secure=request.is_secure,
+            )
+    return resp
 
 
 @main.route("/api/schedule")
@@ -107,16 +142,24 @@ def api_schedule():
 @main.route("/api/games/<game_id>/watched", methods=["POST"])
 def api_set_watched(game_id):
     """Toggle watched status for a game."""
-    data = request.get_json()
-    set_watched(game_id, data.get("watched", False))
+    if not _write_allowed():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    set_watched(game_id, bool(data.get("watched", False)))
     return jsonify({"ok": True})
 
 
 @main.route("/api/games/<game_id>/notes", methods=["POST"])
 def api_save_notes(game_id):
     """Save user notes for a game."""
-    data = request.get_json()
-    set_notes(game_id, data.get("notes", ""))
+    if not _write_allowed():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    notes = data.get("notes", "")
+    if not isinstance(notes, str):
+        return jsonify({"error": "notes must be a string"}), 400
+    # Keep notes bounded so a misbehaving client can't balloon the JSON file
+    set_notes(game_id, notes[:2000])
     return jsonify({"ok": True})
 
 

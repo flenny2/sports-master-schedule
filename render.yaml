@@ -11,4 +11,22 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.3"
+      # SCHEDULE_TOKEN: set in the Render dashboard to a long random
+      # string. When set, POST endpoints (watched / notes) require a
+      # matching cookie, which the dashboard installs when you visit
+      # /?token=<value> once. Reads stay public. Leave unset for local
+      # dev or if the URL is already behind auth (Cloudflare Access etc).
+      #
+      # DATA_DIR: directory where userdata.json lives. Defaults to
+      # ./data. On Render's free tier the filesystem is ephemeral so
+      # watched flags and notes reset on every restart. To persist them,
+      # add a Disk (Starter plan + $1/mo for 1GB) and set DATA_DIR to
+      # the mount path, e.g. /var/data.
     autoDeploy: true
+
+    # Uncomment when you've upgraded past the free tier and want
+    # persistent userdata. The code already honors DATA_DIR above.
+    # disk:
+    #   name: data
+    #   mountPath: /var/data
+    #   sizeGB: 1
