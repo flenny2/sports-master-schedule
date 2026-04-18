@@ -823,6 +823,15 @@ main {
 .tier.notable     { background: var(--notable); color: var(--bg); }
 .tier.major-event { background: var(--major-event); color: #fff; }
 
+/* Post-Season — outlined purple tag, stacks next to the tier tag */
+.tier.post-season {
+    background: rgba(139, 92, 246, 0.12);
+    color: var(--major-event);
+    border: 1px solid var(--major-event);
+    box-shadow: 0 0 6px rgba(139, 92, 246, 0.25);
+    letter-spacing: 0.08em;
+}
+
 .gc-league {
     color: var(--text-2);
     font-weight: 500;

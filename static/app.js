@@ -892,6 +892,11 @@ function buildCard(g) {
     var tierTxt = (g.tier || "notable").replace(/_/g, " ");
     meta.appendChild(el("span", "tier " + tierCls, tierTxt));
 
+    // Post-Season tag — separate from tier, stacks next to it
+    if (g.is_playoff) {
+        meta.appendChild(el("span", "tier post-season", "post-season"));
+    }
+
     meta.appendChild(el("span", "gc-league", g.league_name));
     meta.appendChild(el("span", "gc-sep", "\u00b7"));
 
