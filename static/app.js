@@ -1034,76 +1034,122 @@ function renderPlayoffs(games) {
         else upcoming.push(g);
     });
 
-    upcoming.sort(function(a, b) { return a.date.localeCompare(b.date); });
-    completed.sort(function(a, b) { return b.date.localeCompare(a.date); });
-
-    // Live now
+    // Live now — flat list (always visible, it's happening right now)
     if (live.length > 0) {
         var liveSection = el("div", "po-section");
         var liveLabel = el("div", "po-section-label live");
         liveLabel.appendChild(el("span", "po-live-dot"));
         liveLabel.appendChild(document.createTextNode("Live Now"));
         liveSection.appendChild(liveLabel);
-        liveSection.appendChild(buildPlayoffGroups(live));
+        var liveList = el("div", "po-games");
+        live.forEach(function(g) { liveList.appendChild(buildCard(g)); });
+        liveSection.appendChild(liveList);
         playoffsView.appendChild(liveSection);
     }
 
-    // Upcoming
+    // Upcoming — collapsible by date; today + tomorrow auto-expanded
     if (upcoming.length > 0) {
         var upSection = el("div", "po-section");
         upSection.appendChild(el("div", "po-section-label", "Upcoming"));
-        upSection.appendChild(buildPlayoffGroups(upcoming));
+        buildPlayoffDateGroups(upcoming, upSection, "upcoming");
         playoffsView.appendChild(upSection);
     }
 
-    // Recent results
+    // Recent results — collapsible by date; only the most recent day open
     if (completed.length > 0) {
         var compSection = el("div", "po-section");
         compSection.appendChild(el("div", "po-section-label", "Recent Results"));
-        compSection.appendChild(buildPlayoffGroups(completed));
+        buildPlayoffDateGroups(completed, compSection, "recent");
         playoffsView.appendChild(compSection);
     }
 }
 
-/** Group a set of playoff games by competition (league_name) */
-function buildPlayoffGroups(games) {
-    var wrap = document.createDocumentFragment();
+/**
+ * Group playoff games by calendar day and append one collapsible
+ * section per date to `container`.
+ *
+ * mode="upcoming": dates ascending; Today + Tomorrow auto-expand.
+ * mode="recent":   dates descending; only the most recent day expands.
+ */
+function buildPlayoffDateGroups(games, container, mode) {
+    var today = todayStr();
+    var tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    var tomorrow = tomorrowDate.toLocaleDateString("en-CA");
 
-    // Group by league_name, preserving insertion order
-    var groups = {};
-    var order = [];
+    // Group by local calendar date
+    var byDate = {};
+    var dates = [];
     games.forEach(function(g) {
-        var key = g.league_name || "Other";
-        if (!groups[key]) {
-            groups[key] = { round: g.playoff_round || "", games: [] };
-            order.push(key);
+        var k = new Date(g.date).toLocaleDateString("en-CA");
+        if (!byDate[k]) {
+            byDate[k] = [];
+            dates.push(k);
         }
-        groups[key].games.push(g);
+        byDate[k].push(g);
     });
 
-    order.forEach(function(name) {
-        var group = groups[name];
-        var comp = el("div", "po-competition");
+    dates.sort(function(a, b) {
+        return mode === "recent" ? b.localeCompare(a) : a.localeCompare(b);
+    });
 
-        var ch = el("div", "po-comp-head");
-        ch.appendChild(el("span", "po-comp-name", name));
-        if (group.round && group.round.toLowerCase() !== name.toLowerCase()) {
-            ch.appendChild(el("span", "po-comp-round", group.round));
+    dates.forEach(function(dk, idx) {
+        var dayGames = byDate[dk];
+        dayGames.sort(function(a, b) { return a.date.localeCompare(b.date); });
+
+        var isToday = dk === today;
+        var isTomorrow = dk === tomorrow;
+        var openByDefault = (mode === "upcoming")
+            ? (isToday || isTomorrow)
+            : (idx === 0);
+
+        var group = el("div", "po-date-group" + (openByDefault ? " open" : ""));
+
+        var dhead = el("div", "po-date-head");
+        var caret = el("span", "po-caret", openByDefault ? "\u25BE" : "\u25B8");
+        dhead.appendChild(caret);
+
+        var dateObj = new Date(dk + "T12:00:00");
+        var dateLabel = dateObj.toLocaleDateString("en-US", {
+            weekday: "long", month: "short", day: "numeric"
+        });
+        var dLabel = el("span", "po-date-label");
+        dLabel.appendChild(document.createTextNode(dateLabel));
+        if (isToday) {
+            dLabel.appendChild(el("span", "po-date-badge today", "Today"));
+        } else if (isTomorrow) {
+            dLabel.appendChild(el("span", "po-date-badge tomorrow", "Tomorrow"));
         }
-        ch.appendChild(el("span", "po-comp-count",
-            group.games.length +
-            (group.games.length === 1 ? " game" : " games")));
-        comp.appendChild(ch);
+        dhead.appendChild(dLabel);
 
+        // Compact sport summary (e.g. "5 NBA · 1 FA Cup") so a collapsed
+        // date still tells you what's on without expanding.
+        var byComp = {};
+        dayGames.forEach(function(g) {
+            var name = g.league_name || "Other";
+            byComp[name] = (byComp[name] || 0) + 1;
+        });
+        var summary = Object.keys(byComp).map(function(name) {
+            return byComp[name] + " " + name;
+        }).join(" \u00b7 ");
+        dhead.appendChild(el("span", "po-date-summary", summary));
+        dhead.appendChild(el("span", "po-date-count",
+            dayGames.length + (dayGames.length === 1 ? " game" : " games")));
+
+        dhead.addEventListener("click", function() {
+            var isOpen = group.classList.toggle("open");
+            caret.textContent = isOpen ? "\u25BE" : "\u25B8";
+        });
+        group.appendChild(dhead);
+
+        var body = el("div", "po-date-body");
         var list = el("div", "po-games");
-        group.games.forEach(function(g) { list.appendChild(buildCard(g)); });
-        comp.appendChild(list);
-        wrap.appendChild(comp);
-    });
+        dayGames.forEach(function(g) { list.appendChild(buildCard(g)); });
+        body.appendChild(list);
+        group.appendChild(body);
 
-    var container = el("div", null);
-    container.appendChild(wrap);
-    return container;
+        container.appendChild(group);
+    });
 }
 
 // ═════════════════════════════════════════════════════════════════
