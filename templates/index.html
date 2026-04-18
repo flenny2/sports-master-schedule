@@ -27,11 +27,22 @@
     </header>
     <div class="header-accent"></div>
 
+    <!-- ── Today summary strip (banner across all views) ────────── -->
+    <div id="today-strip" class="today-strip hidden" role="button" tabindex="0">
+        <span class="ts-label">TODAY</span>
+        <span id="ts-content" class="ts-content"></span>
+        <span class="ts-cta">View &rsaquo;</span>
+    </div>
+
     <!-- ── Tab bar ──────────────────────────────────────────────── -->
     <nav class="tab-bar">
         <div class="view-tabs">
             <button class="tab active" data-view="week">Calendar</button>
             <button class="tab" data-view="today">Today</button>
+            <button class="tab tab-playoffs" data-view="playoffs">
+                <span class="tab-trophy" aria-hidden="true">&#9782;</span>
+                Playoffs
+            </button>
             <button class="tab" data-view="tables">Tables</button>
         </div>
         <div class="sport-filters">
@@ -49,6 +60,7 @@
             <div class="detail-panel" id="detail-panel"></div>
         </div>
         <div id="today-view" class="hidden"></div>
+        <div id="playoffs-view" class="hidden"></div>
         <div id="tables-view" class="hidden"></div>
         <div id="status-message" class="status-message"></div>
     </main>

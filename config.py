@@ -29,7 +29,10 @@ WATCHED_TEAMS = [
         "name": "Arsenal",
         "espn_id": "359",
         "sport": "soccer",
-        "leagues": ["eng.1", "uefa.champions"],
+        "leagues": [
+            "eng.1", "uefa.champions", "uefa.europa",
+            "eng.fa", "eng.league_cup",
+        ],
         "tier": "must_watch",
     },
     {
@@ -44,6 +47,13 @@ WATCHED_TEAMS = [
         "espn_id": "83",
         "sport": "soccer",
         "leagues": ["esp.1", "uefa.champions"],
+        "tier": "notable",
+    },
+    {
+        "name": "Bayern Munich",
+        "espn_id": "132",
+        "sport": "soccer",
+        "leagues": ["ger.1", "uefa.champions"],
         "tier": "notable",
     },
 ]
@@ -85,8 +95,15 @@ LEAGUE_NAMES = {
     "eng.fa": "FA Cup",
     "eng.league_cup": "League Cup",
     "esp.1": "La Liga",
+    "esp.copa_del_rey": "Copa del Rey",
+    "ger.1": "Bundesliga",
+    "ger.dfb_pokal": "DFB-Pokal",
+    "ita.1": "Serie A",
+    "fra.1": "Ligue 1",
     "uefa.champions": "Champions League",
     "uefa.europa": "Europa League",
+    "uefa.europa.conf": "Conference League",
+    "fifa.cwc": "Club World Cup",
     "nfl": "NFL",
     "nba": "NBA",
 }

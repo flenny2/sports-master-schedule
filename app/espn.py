@@ -6,11 +6,16 @@ No API key needed. Data is cached in memory to avoid hammering the API.
 """
 
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor
 import requests
 from datetime import datetime, timedelta
 import pytz
 
 import config
+
+# Max parallel HTTP requests — keeps us gentle on ESPN's public endpoints
+_MAX_WORKERS = 8
 
 BASE_URL = "https://site.api.espn.com/apis/site/v2/sports"
 
@@ -25,7 +30,11 @@ BROADCAST_DISPLAY = {
 
 # ── In-memory cache ───────────────────────────────────────────────
 # Format: { "cache_key": (data, timestamp) }
+# Lock protects writes when multiple threads fetch in parallel. Reads of
+# a single key are atomic in CPython, but double-writes from two threads
+# racing on the same URL would waste API calls.
 _cache = {}
+_cache_lock = threading.Lock()
 
 
 def _cached_get(url, params=None):
@@ -38,8 +47,9 @@ def _cached_get(url, params=None):
     cache_key = f"{url}?{param_str}"
 
     # Check cache
-    if cache_key in _cache:
-        data, fetched_at = _cache[cache_key]
+    cached = _cache.get(cache_key)
+    if cached is not None:
+        data, fetched_at = cached
         age = time.time() - fetched_at
         if age < config.CACHE_TTL_SECONDS:
             return data
@@ -49,7 +59,8 @@ def _cached_get(url, params=None):
         resp = requests.get(url, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
-        _cache[cache_key] = (data, time.time())
+        with _cache_lock:
+            _cache[cache_key] = (data, time.time())
         return data
     except requests.RequestException as e:
         print(f"[ESPN] Request failed: {url} — {e}")
@@ -58,7 +69,37 @@ def _cached_get(url, params=None):
 
 def clear_cache():
     """Clear all cached data (used by the manual refresh button)."""
-    _cache.clear()
+    with _cache_lock:
+        _cache.clear()
+
+
+def _parallel_fetch_days(sport, league_slug, start_date, end_date):
+    """
+    Fetch per-day scoreboards for a date range in parallel.
+    Returns a deduplicated list of parsed games.
+    """
+    dates = []
+    current = start_date
+    while current <= end_date:
+        dates.append(current.strftime("%Y%m%d"))
+        current += timedelta(days=1)
+
+    seen_ids = set()
+    games = []
+
+    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+        results = executor.map(
+            lambda d: fetch_scoreboard(sport, league_slug, d),
+            dates,
+        )
+        for day_games in results:
+            for game in day_games:
+                gid = game["id"]
+                if gid not in seen_ids:
+                    seen_ids.add(gid)
+                    games.append(game)
+
+    return games
 
 
 # ── Parsing helpers ───────────────────────────────────────────────
@@ -235,14 +276,17 @@ def fetch_scoreboard(sport, league_slug, date_str=None, extra_params=None):
 
 def fetch_nfl_games(start_date, end_date):
     """
-    Fetch NFL games. During the season, returns the current week's games
+    Fetch NFL games across the given date range.
+    Includes past games (with final scores) + upcoming games,
     filtered to primetime (TNF, SNF, MNF) and RedZone Sundays.
     """
-    # Calling without params returns the current/most relevant week
-    games = fetch_scoreboard("football", "nfl")
+    # Iterate day-by-day so past weeks + future dates are both covered.
+    # Without a `dates=` param, ESPN only returns the current week.
+    raw_games = _parallel_fetch_days("football", "nfl", start_date, end_date)
 
-    # Filter to date range
-    games = _filter_to_date_range(games, start_date, end_date)
+    # Filter to date range (scoreboard-by-date is already scoped, but
+    # this also handles edge cases around timezone boundaries)
+    games = _filter_to_date_range(raw_games, start_date, end_date)
 
     # Identify primetime and RedZone-relevant games
     tz = pytz.timezone(config.TIMEZONE)
@@ -298,34 +342,37 @@ def fetch_soccer_games(start_date, end_date):
     games = []
     seen_ids = set()  # Avoid duplicates across league queries
 
-    # 1) Fetch each watched team's schedule across their leagues
+    # 1) Fetch each watched team's schedule across their leagues — in parallel.
+    #    Each (team, league) pair is an independent ESPN API call.
+    team_league_pairs = []
     for team in config.WATCHED_TEAMS:
         if team["sport"] != "soccer":
             continue
         for league in team["leagues"]:
-            team_games = fetch_team_schedule("soccer", league, team["espn_id"])
+            team_league_pairs.append((league, team["espn_id"]))
+
+    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+        results = executor.map(
+            lambda p: fetch_team_schedule("soccer", p[0], p[1]),
+            team_league_pairs,
+        )
+        for team_games in results:
             for game in team_games:
                 if game["id"] not in seen_ids:
                     seen_ids.add(game["id"])
                     games.append(game)
 
-    # 2) Detect top-6 PL matchups for the date range
-    #    Fetch PL scoreboard for each day in the range
+    # 2) Detect top-6 PL matchups for the date range — parallel per-day
     top_ids = set(config.PL_TOP_TEAMS.keys())
-    current = start_date
-    while current <= end_date:
-        date_str = current.strftime("%Y%m%d")
-        day_games = fetch_scoreboard("soccer", "eng.1", date_str)
-        for game in day_games:
-            if game["id"] in seen_ids:
-                continue
-            # Check if both teams are in the top-6
-            home_id = game["home_team"]["id"]
-            away_id = game["away_team"]["id"]
-            if home_id in top_ids and away_id in top_ids:
-                seen_ids.add(game["id"])
-                games.append(game)
-        current += timedelta(days=1)
+    pl_day_games = _parallel_fetch_days("soccer", "eng.1", start_date, end_date)
+    for game in pl_day_games:
+        if game["id"] in seen_ids:
+            continue
+        home_id = game["home_team"]["id"]
+        away_id = game["away_team"]["id"]
+        if home_id in top_ids and away_id in top_ids:
+            seen_ids.add(game["id"])
+            games.append(game)
 
     # Filter to requested date range
     return _filter_to_date_range(games, start_date, end_date)
@@ -336,34 +383,29 @@ def fetch_nba_games(start_date, end_date):
     Fetch NBA games — only playoffs and play-in tournament.
     Regular season games are excluded no matter how big they seem.
     """
+    day_games = _parallel_fetch_days(
+        "basketball", "nba", start_date, end_date)
+
     games = []
     seen_ids = set()
+    for game in day_games:
+        if game["id"] in seen_ids:
+            continue
 
-    current = start_date
-    while current <= end_date:
-        date_str = current.strftime("%Y%m%d")
-        day_games = fetch_scoreboard("basketball", "nba", date_str)
+        # Only include playoff (season type 3) or play-in (season type 5)
+        season_type = game.get("season_type", 2)
+        notes_lower = game.get("notes", "").lower()
 
-        for game in day_games:
-            if game["id"] in seen_ids:
-                continue
+        is_postseason = season_type in (3, 5)
+        has_playoff_notes = any(
+            kw in notes_lower
+            for kw in ("playoff", "play-in", "finals", "semifinal", "conference")
+        )
 
-            # Only include playoff (season type 3) or play-in (season type 5)
-            season_type = game.get("season_type", 2)
-            notes_lower = game.get("notes", "").lower()
-
-            is_postseason = season_type in (3, 5)
-            has_playoff_notes = any(
-                kw in notes_lower
-                for kw in ("playoff", "play-in", "finals", "semifinal", "conference")
-            )
-
-            if is_postseason or has_playoff_notes:
-                game["is_playoff"] = True
-                seen_ids.add(game["id"])
-                games.append(game)
-
-        current += timedelta(days=1)
+        if is_postseason or has_playoff_notes:
+            game["is_playoff"] = True
+            seen_ids.add(game["id"])
+            games.append(game)
 
     return games
 
@@ -375,12 +417,19 @@ def get_all_games(start_date, end_date):
     Fetch all relevant games across all sports for a date range.
     Returns a list of game dicts sorted by date.
     """
+    # Run the three sport fetchers in parallel. Each one internally runs
+    # its own per-day pool, but they don't share state so they can nest.
+    fetchers = [fetch_nfl_games, fetch_soccer_games, fetch_nba_games]
     all_games = []
-
-    # Fetch each sport (these could fail independently — that's OK)
-    all_games.extend(fetch_nfl_games(start_date, end_date))
-    all_games.extend(fetch_soccer_games(start_date, end_date))
-    all_games.extend(fetch_nba_games(start_date, end_date))
+    with ThreadPoolExecutor(max_workers=len(fetchers)) as executor:
+        futures = [
+            executor.submit(fn, start_date, end_date) for fn in fetchers
+        ]
+        for f in futures:
+            try:
+                all_games.extend(f.result())
+            except Exception as e:
+                print(f"[ESPN] sport fetch failed: {e}")
 
     # Sort by date
     all_games.sort(key=lambda g: g.get("date", ""))
@@ -514,6 +563,7 @@ def get_all_standings():
     leagues = [
         ("soccer", "eng.1"),
         ("soccer", "esp.1"),
+        ("soccer", "ger.1"),
         ("soccer", "uefa.champions"),
         ("basketball", "nba"),
     ]

@@ -66,4 +66,8 @@ Server runs on http://localhost:5000 with debug/auto-reload enabled.
 - `static/style.css` — all styles (dark theme, responsive, sport-colored accents)
 
 ## Testing
-No test suite exists. Verify changes by running the app and checking the UI manually.
+Pytest suite in `tests/` covers availability, importance, userdata, and ESPN
+parsing helpers (no network). Run: `python3 -m pytest tests/ -v`
+
+For anything touching the UI or live ESPN responses, still verify manually
+by running the app and exercising the feature in a browser.

@@ -9,6 +9,7 @@ from flask import Blueprint, render_template, jsonify, request
 from app.espn import get_all_games, get_all_standings, get_title_races, clear_cache
 from app.importance import tag_importance
 from app.availability import tag_availability
+from app.playoff import tag_playoff
 from app.userdata import get_all_userdata, set_watched, set_notes
 
 main = Blueprint("main", __name__)
@@ -74,9 +75,10 @@ def api_schedule():
     # Fetch games from ESPN
     games = get_all_games(start_date, end_date)
 
-    # Tag each game with importance tier and availability
+    # Tag each game with importance tier, availability, and playoff status
     games = tag_importance(games)
     games = tag_availability(games)
+    games = tag_playoff(games)
 
     # Merge in user data (watched flags, notes)
     user_data = get_all_userdata()

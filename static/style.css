@@ -89,6 +89,114 @@ header {
     z-index: 99;
 }
 
+/* ── Today strip (persistent banner across all views) ────────── */
+.today-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.55rem 1.25rem;
+    background: linear-gradient(
+        90deg,
+        rgba(212, 163, 50, 0.10) 0%,
+        rgba(212, 163, 50, 0.02) 80%
+    );
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background 120ms var(--ease);
+    position: sticky;
+    top: 46px;
+    z-index: 98;
+}
+
+.today-strip:hover { background: rgba(212, 163, 50, 0.14); }
+
+.today-strip .ts-label {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--gold);
+    font-size: 0.75rem;
+}
+
+.today-strip .ts-content {
+    flex: 1;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.today-strip .ts-count {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.today-strip .ts-dots {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+}
+
+.today-strip .ts-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    display: inline-block;
+}
+.today-strip .ts-dot.soccer     { background: var(--soccer); }
+.today-strip .ts-dot.basketball { background: var(--basketball); }
+.today-strip .ts-dot.football   { background: var(--football); }
+
+.today-strip .ts-next {
+    color: var(--text-2);
+    font-size: 0.8rem;
+}
+.today-strip .ts-next b {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.today-strip .ts-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--must-watch);
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.today-strip .ts-live::before {
+    content: "";
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--must-watch);
+    animation: ts-pulse 1.4s ease-in-out infinite;
+}
+@keyframes ts-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+.today-strip .ts-empty { color: var(--text-2); font-style: italic; }
+
+.today-strip .ts-cta {
+    color: var(--gold);
+    font-weight: 600;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    .today-strip {
+        padding: 0.5rem 0.9rem;
+        gap: 0.55rem;
+        font-size: 0.78rem;
+    }
+    .today-strip .ts-cta { display: none; }
+}
+
 /* Week navigator */
 .week-nav {
     display: flex;
@@ -179,6 +287,145 @@ header {
 .tab.active {
     color: var(--gold);
     border-bottom-color: var(--gold);
+}
+
+/* Playoffs tab — extra visible with trophy icon and accent */
+.tab-playoffs {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--major-event);
+    position: relative;
+}
+.tab-playoffs .tab-trophy {
+    font-size: 1rem;
+    line-height: 1;
+    filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.5));
+}
+.tab-playoffs:hover {
+    color: #a78bfa;
+}
+.tab-playoffs.active {
+    color: var(--major-event);
+    border-bottom-color: var(--major-event);
+    background: linear-gradient(
+        180deg, transparent 0%,
+        rgba(139, 92, 246, 0.08) 100%);
+}
+.tab-playoffs.has-live::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--must-watch);
+    animation: ts-pulse 1.4s ease-in-out infinite;
+    margin-left: 0.15rem;
+}
+
+/* ── Playoffs view ──────────────────────────────────────────────── */
+#playoffs-view {
+    padding: 1rem 1.25rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.playoffs-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+    margin-bottom: 1.1rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--border);
+}
+.playoffs-head .ph-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.4rem;
+    letter-spacing: 0.08em;
+    color: var(--major-event);
+    text-transform: uppercase;
+}
+.playoffs-head .ph-count {
+    color: var(--text-2);
+    font-size: 0.85rem;
+}
+
+.po-empty {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--text-2);
+    font-style: italic;
+}
+
+.po-section {
+    margin-bottom: 1.8rem;
+}
+.po-section-label {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    margin-bottom: 0.55rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px dashed var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.po-section-label.live { color: var(--must-watch); }
+.po-section-label .po-live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--must-watch);
+    animation: ts-pulse 1.4s ease-in-out infinite;
+}
+
+.po-competition {
+    margin-bottom: 1.2rem;
+}
+.po-comp-head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.4rem;
+    padding: 0.35rem 0.5rem;
+    background: var(--surface-1);
+    border-left: 3px solid var(--major-event);
+    border-radius: 0 var(--radius) var(--radius) 0;
+}
+.po-comp-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text);
+    font-size: 0.95rem;
+}
+.po-comp-count {
+    color: var(--text-3);
+    font-size: 0.78rem;
+    margin-left: auto;
+}
+.po-comp-round {
+    color: var(--major-event);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.5rem;
+    background: rgba(139, 92, 246, 0.12);
+    border-radius: 3px;
+}
+
+.po-games {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 0.5rem;
+}
+@media (max-width: 640px) {
+    #playoffs-view { padding: 0.8rem 0.7rem 1.5rem; }
+    .po-games { grid-template-columns: 1fr; }
 }
 
 .sport-filters {

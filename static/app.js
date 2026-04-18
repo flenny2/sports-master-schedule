@@ -33,10 +33,13 @@ var monthLabel   = document.getElementById("week-label");
 var btnPrev      = document.getElementById("btn-prev");
 var btnNext      = document.getElementById("btn-next");
 var btnRefresh   = document.getElementById("btn-refresh");
+var todayStrip   = document.getElementById("today-strip");
+var tsContent    = document.getElementById("ts-content");
 var calGrid      = document.getElementById("calendar-grid");
 var detPanel     = document.getElementById("detail-panel");
 var weekView     = document.getElementById("week-view");
 var todayView    = document.getElementById("today-view");
+var playoffsView = document.getElementById("playoffs-view");
 var tablesView   = document.getElementById("tables-view");
 var statusMsg    = document.getElementById("status-message");
 
@@ -218,6 +221,18 @@ btnNext.addEventListener("click", function() {
 
 btnRefresh.addEventListener("click", function() { loadSchedule(true); });
 
+// Clicking the today strip jumps to the Today view
+todayStrip.addEventListener("click", function() {
+    var todayTab = document.querySelector('.tab[data-view="today"]');
+    if (todayTab) todayTab.click();
+});
+todayStrip.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        todayStrip.click();
+    }
+});
+
 document.querySelectorAll(".tab").forEach(function(t) {
     t.addEventListener("click", function() {
         document.querySelectorAll(".tab").forEach(function(x) {
@@ -255,6 +270,7 @@ function loadSchedule(refresh) {
     clear(calGrid);
     clear(detPanel);
     clear(todayView);
+    clear(playoffsView);
     clear(tablesView);
     if (refresh) standingsLoaded = false;
     statusMsg.textContent = "Loading\u2026";
@@ -286,6 +302,8 @@ function loadSchedule(refresh) {
         }
 
         render();
+        renderTodayStrip();
+        updatePlayoffsTabBadge();
     }).catch(function(err) {
         hide(weekView);
         hide(todayView);
@@ -294,6 +312,92 @@ function loadSchedule(refresh) {
         statusMsg.appendChild(el("div", "hint", err.message));
         show(statusMsg);
     });
+}
+
+/** Persistent banner summarising today across all views */
+function renderTodayStrip() {
+    if (!todayStrip || !tsContent) return;
+    clear(tsContent);
+
+    var today = todayStr();
+    var gbd = groupByDay(allGames);
+    var todayGames = gbd[today] || [];
+
+    // Nothing today — still show the strip so the next-up game stays visible
+    if (todayGames.length === 0) {
+        var nextUp = findNextGame(allGames);
+        if (!nextUp) {
+            hide(todayStrip);
+            return;
+        }
+        tsContent.appendChild(el("span", "ts-empty", "No games today"));
+        tsContent.appendChild(el("span", "ts-sep", "\u00b7"));
+        var nextLabel = el("span", "ts-next");
+        nextLabel.appendChild(document.createTextNode("Next: "));
+        var nb = el("b", null,
+            nextUp.away_team.abbreviation + " @ " + nextUp.home_team.abbreviation);
+        nextLabel.appendChild(nb);
+        var nextDateStr = new Date(nextUp.date).toLocaleDateString("en-CA");
+        nextLabel.appendChild(document.createTextNode(
+            " \u00b7 " + fmtDateShort(nextDateStr) + " " + fmtTime(nextUp.date)));
+        tsContent.appendChild(nextLabel);
+        show(todayStrip);
+        return;
+    }
+
+    var live = todayGames.filter(function(g) { return g.status === "in"; });
+    var upcoming = todayGames.filter(function(g) { return g.status === "pre"; });
+    upcoming.sort(function(a, b) { return a.date.localeCompare(b.date); });
+
+    // Count + sport dots
+    var count = el("span", "ts-count",
+        todayGames.length + (todayGames.length === 1 ? " game today" : " games today"));
+    tsContent.appendChild(count);
+
+    var sportsSet = {};
+    todayGames.forEach(function(g) { sportsSet[g.sport] = true; });
+    var dots = el("span", "ts-dots");
+    ["soccer", "basketball", "football"].forEach(function(sp) {
+        if (sportsSet[sp]) dots.appendChild(el("span", "ts-dot " + sp));
+    });
+    tsContent.appendChild(dots);
+
+    // Live indicator takes priority
+    if (live.length > 0) {
+        var liveEl = el("span", "ts-live",
+            live.length + (live.length === 1 ? " live" : " live"));
+        tsContent.appendChild(liveEl);
+        var g = live[0];
+        var liveInfo = el("span", "ts-next");
+        liveInfo.appendChild(el("b", null,
+            g.away_team.abbreviation + " " +
+            (g.score ? g.score.away : "0") + "\u2013" +
+            (g.score ? g.score.home : "0") + " " + g.home_team.abbreviation));
+        tsContent.appendChild(liveInfo);
+    } else if (upcoming.length > 0) {
+        var next = upcoming[0];
+        var upEl = el("span", "ts-next");
+        upEl.appendChild(document.createTextNode("Next: "));
+        upEl.appendChild(el("b", null,
+            next.away_team.abbreviation + " @ " + next.home_team.abbreviation));
+        upEl.appendChild(document.createTextNode(" at " + fmtTime(next.date)));
+        tsContent.appendChild(upEl);
+    } else {
+        // All of today's games are completed
+        tsContent.appendChild(el("span", "ts-next", "All games finished"));
+    }
+
+    show(todayStrip);
+}
+
+/** Pulse red dot on the Playoffs tab when a playoff game is live */
+function updatePlayoffsTabBadge() {
+    var tab = document.querySelector('.tab-playoffs');
+    if (!tab) return;
+    var hasLive = allGames.some(function(g) {
+        return g.is_playoff && g.status === "in";
+    });
+    tab.classList.toggle("has-live", hasLive);
 }
 
 /** Eagerly load standings so expanded cards can show context */
@@ -328,16 +432,25 @@ function render() {
     if (currentView === "week") {
         show(weekView);
         hide(todayView);
+        hide(playoffsView);
         hide(tablesView);
         renderCalendar(games);
     } else if (currentView === "today") {
         hide(weekView);
         show(todayView);
+        hide(playoffsView);
         hide(tablesView);
         renderToday(games);
+    } else if (currentView === "playoffs") {
+        hide(weekView);
+        hide(todayView);
+        show(playoffsView);
+        hide(tablesView);
+        renderPlayoffs(games);
     } else if (currentView === "tables") {
         hide(weekView);
         hide(todayView);
+        hide(playoffsView);
         show(tablesView);
         loadAndRenderTables();
     }
@@ -881,6 +994,111 @@ function buildCard(g) {
     card.appendChild(detail);
 
     return card;
+}
+
+// ═════════════════════════════════════════════════════════════════
+// PLAYOFFS VIEW — knockout rounds, cup finals, postseason
+// ═════════════════════════════════════════════════════════════════
+
+function renderPlayoffs(games) {
+    clear(playoffsView);
+
+    var playoffGames = games.filter(function(g) { return g.is_playoff; });
+
+    // Header
+    var head = el("div", "playoffs-head");
+    head.appendChild(el("span", "ph-title", "Playoffs & Finals"));
+    head.appendChild(el("span", "ph-count",
+        playoffGames.length +
+        (playoffGames.length === 1 ? " game" : " games") +
+        " this month"));
+    playoffsView.appendChild(head);
+
+    if (playoffGames.length === 0) {
+        playoffsView.appendChild(el("div", "po-empty",
+            "No playoff or knockout games in this month. " +
+            "Browse another month with the arrows above."));
+        return;
+    }
+
+    // Partition by status
+    var live = [], upcoming = [], completed = [];
+    playoffGames.forEach(function(g) {
+        if (g.status === "in") live.push(g);
+        else if (g.status === "post") completed.push(g);
+        else upcoming.push(g);
+    });
+
+    upcoming.sort(function(a, b) { return a.date.localeCompare(b.date); });
+    completed.sort(function(a, b) { return b.date.localeCompare(a.date); });
+
+    // Live now
+    if (live.length > 0) {
+        var liveSection = el("div", "po-section");
+        var liveLabel = el("div", "po-section-label live");
+        liveLabel.appendChild(el("span", "po-live-dot"));
+        liveLabel.appendChild(document.createTextNode("Live Now"));
+        liveSection.appendChild(liveLabel);
+        liveSection.appendChild(buildPlayoffGroups(live));
+        playoffsView.appendChild(liveSection);
+    }
+
+    // Upcoming
+    if (upcoming.length > 0) {
+        var upSection = el("div", "po-section");
+        upSection.appendChild(el("div", "po-section-label", "Upcoming"));
+        upSection.appendChild(buildPlayoffGroups(upcoming));
+        playoffsView.appendChild(upSection);
+    }
+
+    // Recent results
+    if (completed.length > 0) {
+        var compSection = el("div", "po-section");
+        compSection.appendChild(el("div", "po-section-label", "Recent Results"));
+        compSection.appendChild(buildPlayoffGroups(completed));
+        playoffsView.appendChild(compSection);
+    }
+}
+
+/** Group a set of playoff games by competition (league_name) */
+function buildPlayoffGroups(games) {
+    var wrap = document.createDocumentFragment();
+
+    // Group by league_name, preserving insertion order
+    var groups = {};
+    var order = [];
+    games.forEach(function(g) {
+        var key = g.league_name || "Other";
+        if (!groups[key]) {
+            groups[key] = { round: g.playoff_round || "", games: [] };
+            order.push(key);
+        }
+        groups[key].games.push(g);
+    });
+
+    order.forEach(function(name) {
+        var group = groups[name];
+        var comp = el("div", "po-competition");
+
+        var ch = el("div", "po-comp-head");
+        ch.appendChild(el("span", "po-comp-name", name));
+        if (group.round && group.round.toLowerCase() !== name.toLowerCase()) {
+            ch.appendChild(el("span", "po-comp-round", group.round));
+        }
+        ch.appendChild(el("span", "po-comp-count",
+            group.games.length +
+            (group.games.length === 1 ? " game" : " games")));
+        comp.appendChild(ch);
+
+        var list = el("div", "po-games");
+        group.games.forEach(function(g) { list.appendChild(buildCard(g)); });
+        comp.appendChild(list);
+        wrap.appendChild(comp);
+    });
+
+    var container = el("div", null);
+    container.appendChild(wrap);
+    return container;
 }
 
 // ═════════════════════════════════════════════════════════════════
