@@ -338,8 +338,18 @@ def fetch_soccer_games(start_date, end_date):
     games = []
     seen_ids = set()  # Avoid duplicates across league queries
 
-    # 1) Fetch each watched team's schedule across their leagues — in parallel.
-    #    Each (team, league) pair is an independent ESPN API call.
+    # Build a league → {watched team ids} map for pass 2's filter.
+    # E.g. {"eng.1": {"359", "382"}, "uefa.champions": {"86", "83", ...}}.
+    watched_by_league = {}
+    for team in config.WATCHED_TEAMS:
+        if team["sport"] != "soccer":
+            continue
+        for league in team["leagues"]:
+            watched_by_league.setdefault(league, set()).add(team["espn_id"])
+
+    # ── Pass 1: each watched team's schedule endpoint ──
+    # Returns past games with full records / final scores. Future games
+    # are handled by pass 2 because this endpoint doesn't return them.
     team_league_pairs = []
     for team in config.WATCHED_TEAMS:
         if team["sport"] != "soccer":
@@ -358,17 +368,41 @@ def fetch_soccer_games(start_date, end_date):
                     seen_ids.add(game["id"])
                     games.append(game)
 
-    # 2) Detect top-6 PL matchups for the date range — parallel per-day
+    # ── Pass 2: one date-range scoreboard call per league ──
+    # ESPN's scoreboard endpoint accepts dates=YYYYMMDD-YYYYMMDD and
+    # returns every event in that window in a single response, for both
+    # domestic leagues and cup competitions. One call per league — no
+    # per-day scanning, no calendar parsing. We keep games that involve
+    # a watched team or (PL only) are a top-6 vs top-6 matchup.
     top_ids = set(config.PL_TOP_TEAMS.keys())
-    pl_day_games = _parallel_fetch_days("soccer", "eng.1", start_date, end_date)
-    for game in pl_day_games:
-        if game["id"] in seen_ids:
-            continue
-        home_id = game["home_team"]["id"]
-        away_id = game["away_team"]["id"]
-        if home_id in top_ids and away_id in top_ids:
-            seen_ids.add(game["id"])
-            games.append(game)
+    date_range = (
+        f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}"
+    )
+
+    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+        league_results = executor.map(
+            lambda slug: (slug, fetch_scoreboard("soccer", slug, date_range)),
+            list(watched_by_league.keys()),
+        )
+        for league_slug, league_games in league_results:
+            watched_ids = watched_by_league[league_slug]
+            for game in league_games:
+                if game["id"] in seen_ids:
+                    continue
+                home_id = game["home_team"]["id"]
+                away_id = game["away_team"]["id"]
+                involves_watched = (
+                    home_id in watched_ids or away_id in watched_ids
+                )
+                # PL top-6 matchup is a separate inclusion path
+                is_top_pl_matchup = (
+                    league_slug == "eng.1"
+                    and home_id in top_ids
+                    and away_id in top_ids
+                )
+                if involves_watched or is_top_pl_matchup:
+                    seen_ids.add(game["id"])
+                    games.append(game)
 
     # Filter to requested date range
     return _filter_to_date_range(games, start_date, end_date)

@@ -13,6 +13,7 @@ from app.espn import get_all_games, get_all_standings, get_title_races, clear_ca
 from app.importance import tag_importance
 from app.availability import tag_availability
 from app.playoff import tag_playoff
+from app.storylines import tag_storylines, get_active_storylines
 from app.userdata import get_all_userdata, set_watched, set_notes
 
 main = Blueprint("main", __name__)
@@ -121,6 +122,7 @@ def api_schedule():
     games = tag_importance(games)
     games = tag_availability(games)
     games = tag_playoff(games)
+    games = tag_storylines(games)
 
     # Merge in user data (watched flags, notes)
     user_data = get_all_userdata()
@@ -161,6 +163,12 @@ def api_save_notes(game_id):
     # Keep notes bounded so a misbehaving client can't balloon the JSON file
     set_notes(game_id, notes[:2000])
     return jsonify({"ok": True})
+
+
+@main.route("/api/storylines")
+def api_storylines():
+    """Return the active storylines for the frontend filter UI."""
+    return jsonify({"storylines": get_active_storylines()})
 
 
 @main.route("/api/standings")

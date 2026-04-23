@@ -91,6 +91,31 @@ def test_filter_to_date_range():
     assert out[0]["date"] == "2026-04-15T19:00Z"
 
 
+def test_soccer_fetch_uses_date_range_per_league(monkeypatch):
+    """Pass 2 should hit the scoreboard once per league with YYYYMMDD-YYYYMMDD."""
+    calls = []
+
+    def fake_scoreboard(sport, slug, date_str=None):
+        calls.append((sport, slug, date_str))
+        return []
+
+    # fetch_team_schedule runs in pass 1 — short-circuit it to an empty
+    # list so we only exercise pass 2.
+    monkeypatch.setattr(
+        espn, "fetch_team_schedule", lambda *a, **kw: [])
+    monkeypatch.setattr(espn, "fetch_scoreboard", fake_scoreboard)
+
+    espn.fetch_soccer_games(date(2026, 3, 30), date(2026, 5, 3))
+
+    # Every call should use the range param (one per watched-league)
+    assert calls, "expected at least one scoreboard call"
+    for _sport, _slug, date_str in calls:
+        assert date_str == "20260330-20260503"
+    # And each watched league should be hit exactly once
+    slugs = [c[1] for c in calls]
+    assert len(slugs) == len(set(slugs)), f"duplicate league fetches: {slugs}"
+
+
 def test_cache_roundtrip(monkeypatch):
     """_cached_get should return cached data without hitting the network."""
     calls = {"n": 0}

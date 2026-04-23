@@ -25,6 +25,10 @@ var standingsLoaded = false;
 var titleRacesData = [];
 var countdownTimer = null;
 var lastMobileState = null;  // track viewport changes
+var storylinesData = [];     // [{id, label, description}]
+var activeStorylineId = null; // currently-selected filter, or null
+var initialScrollDone = false; // desktop: scroll-to-today only once per load
+var mobileWindowStart = null;  // mobile 7-day window start, "YYYY-MM-DD"
 
 var MOBILE_BP = 640;
 
@@ -42,6 +46,7 @@ var todayView    = document.getElementById("today-view");
 var playoffsView = document.getElementById("playoffs-view");
 var tablesView   = document.getElementById("tables-view");
 var statusMsg    = document.getElementById("status-message");
+var storylineFilters = document.getElementById("storyline-filters");
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -122,25 +127,85 @@ function rangeDates() {
     return out;
 }
 
-/** 2-week slice starting from this week's Monday (for mobile) */
-function twoWeekDates() {
-    var all = rangeDates();
-    if (all.length <= 14) return all;
-
-    var today = todayStr();
-    // Find Monday of the current week
-    var d = new Date(today + "T12:00:00");
-    var dayOfWeek = d.getDay(); // 0=Sun
-    var mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    d.setDate(d.getDate() - mondayOffset);
-    var mondayStr = d.toLocaleDateString("en-CA");
-
-    var startIdx = all.indexOf(mondayStr);
-    if (startIdx === -1) {
-        // This week's Monday not in range — show first 14 days
-        return all.slice(0, 14);
+/** Seven date strings starting at mobileWindowStart (mobile view) */
+function mobileWindowDates() {
+    if (!mobileWindowStart) return [];
+    var dates = [];
+    var d = new Date(mobileWindowStart + "T12:00:00");
+    for (var i = 0; i < 7; i++) {
+        dates.push(d.toLocaleDateString("en-CA"));
+        d.setDate(d.getDate() + 1);
     }
-    return all.slice(startIdx, Math.min(startIdx + 14, all.length));
+    return dates;
+}
+
+/** Month that contains the window's midpoint (day 4 of 7) — this is
+ *  the month we fetch so a single padded month fetch covers the window.
+ *  In rare month-boundary cases (month ends Sun → Mon), 1–3 trailing
+ *  days may render empty until the next arrow click shifts the midpoint
+ *  into the new month. Accepted trade-off per project spec. */
+function mobileWindowMidpointMonth() {
+    var d = new Date(mobileWindowStart + "T12:00:00");
+    d.setDate(d.getDate() + 3);
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
+/** Lazy init of the mobile window state. Runs on first mobile render
+ *  and on resize from desktop → mobile when state hasn't been set.
+ *  Returns true if currentYear/currentMonth shifted (caller may need
+ *  to refetch). */
+function initMobileWindowIfNeeded() {
+    if (mobileWindowStart) return false;
+    mobileWindowStart = todayStr();
+    var mid = mobileWindowMidpointMonth();
+    var changed = mid.year !== currentYear || mid.month !== currentMonth;
+    currentYear = mid.year;
+    currentMonth = mid.month;
+    return changed;
+}
+
+function shiftMobileWindow(days) {
+    var d = new Date(mobileWindowStart + "T12:00:00");
+    d.setDate(d.getDate() + days);
+    mobileWindowStart = d.toLocaleDateString("en-CA");
+
+    var mid = mobileWindowMidpointMonth();
+    if (mid.year !== currentYear || mid.month !== currentMonth) {
+        // Window's midpoint crossed into a different month — refetch
+        currentYear = mid.year;
+        currentMonth = mid.month;
+        loadSchedule();
+    } else {
+        updateNav();
+        render();
+    }
+}
+
+/** Format for the nav label on mobile:
+ *    same month:   "Apr 23 – 29"
+ *    crosses mo:   "Apr 27 – May 3"
+ *    crosses yr:   "Dec 30 – Jan 5, 2027" */
+function formatMobileWindowLabel() {
+    var start = new Date(mobileWindowStart + "T12:00:00");
+    var end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    var sameMonth = start.getMonth() === end.getMonth() &&
+                    start.getFullYear() === end.getFullYear();
+    var sameYear = start.getFullYear() === end.getFullYear();
+    var mShort = function(d) {
+        return d.toLocaleDateString("en-US", { month: "short" });
+    };
+    if (sameMonth) {
+        return mShort(start) + " " + start.getDate() +
+               " – " + end.getDate();
+    }
+    if (sameYear) {
+        return mShort(start) + " " + start.getDate() +
+               " – " + mShort(end) + " " + end.getDate();
+    }
+    return mShort(start) + " " + start.getDate() +
+           " – " + mShort(end) + " " + end.getDate() +
+           ", " + end.getFullYear();
 }
 
 /** Look up a team's standings position from pre-fetched data */
@@ -204,19 +269,28 @@ var DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // ── Events ───────────────────────────────────────────────────────
 
-// Month navigation — no limits, browse any month
+// Nav arrows: mobile shifts the 7-day window by ±7 days; desktop
+// navigates whole months. Swipe-to-nav piggybacks on these clicks.
 btnPrev.addEventListener("click", function() {
-    currentMonth--;
-    if (currentMonth < 1) { currentMonth = 12; currentYear--; }
-    selectedDate = null;
-    loadSchedule();
+    if (isMobile()) {
+        shiftMobileWindow(-7);
+    } else {
+        currentMonth--;
+        if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+        selectedDate = null;
+        loadSchedule();
+    }
 });
 
 btnNext.addEventListener("click", function() {
-    currentMonth++;
-    if (currentMonth > 12) { currentMonth = 1; currentYear++; }
-    selectedDate = null;
-    loadSchedule();
+    if (isMobile()) {
+        shiftMobileWindow(+7);
+    } else {
+        currentMonth++;
+        if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+        selectedDate = null;
+        loadSchedule();
+    }
 });
 
 btnRefresh.addEventListener("click", function() { loadSchedule(true); });
@@ -443,6 +517,71 @@ function updatePlayoffsTabBadge() {
     tab.classList.toggle("has-live", hasLive);
 }
 
+/** Fetch the active storylines and build the chip row once */
+function loadStorylines() {
+    fetch("/api/storylines").then(function(r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+    }).then(function(data) {
+        storylinesData = data.storylines || [];
+        renderStorylineFilters();
+    }).catch(function() {
+        // Non-critical — chip bar just won't appear
+    });
+}
+
+/** Build the chip-row DOM (once per page load) */
+function renderStorylineFilters() {
+    if (!storylineFilters) return;
+    clear(storylineFilters);
+    if (!storylinesData.length) {
+        hide(storylineFilters);
+        return;
+    }
+
+    storylineFilters.appendChild(el("span", "sl-filters-label", "Stories"));
+
+    storylinesData.forEach(function(sl) {
+        var chip = el("button", "sl-chip", sl.label);
+        chip.type = "button";
+        chip.setAttribute("data-storyline-id", sl.id);
+        chip.setAttribute("aria-pressed", "false");
+        if (sl.description) chip.title = sl.description;
+        chip.addEventListener("click", function() {
+            // Click-again clears; only one active at a time
+            activeStorylineId =
+                activeStorylineId === sl.id ? null : sl.id;
+            applyStorylineChipState();
+            render();
+        });
+        storylineFilters.appendChild(chip);
+    });
+
+    updateStorylineFilterVisibility();
+    applyStorylineChipState();
+}
+
+/** Sync chip "active" state from activeStorylineId */
+function applyStorylineChipState() {
+    if (!storylineFilters) return;
+    var chips = storylineFilters.querySelectorAll(".sl-chip");
+    chips.forEach(function(c) {
+        var on = c.getAttribute("data-storyline-id") === activeStorylineId;
+        c.classList.toggle("active", on);
+        c.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+}
+
+/** Chip bar is scoped to the Calendar view only */
+function updateStorylineFilterVisibility() {
+    if (!storylineFilters) return;
+    if (currentView === "week" && storylinesData.length > 0) {
+        show(storylineFilters);
+    } else {
+        hide(storylineFilters);
+    }
+}
+
 /** Eagerly load standings so expanded cards can show context */
 function loadStandings() {
     fetch("/api/standings").then(function(r) {
@@ -458,7 +597,11 @@ function loadStandings() {
 }
 
 function updateNav() {
-    monthLabel.textContent = MONTH_NAMES[currentMonth] + " " + currentYear;
+    if (isMobile() && mobileWindowStart) {
+        monthLabel.textContent = formatMobileWindowLabel();
+    } else {
+        monthLabel.textContent = MONTH_NAMES[currentMonth] + " " + currentYear;
+    }
     btnPrev.disabled = false;
     btnNext.disabled = false;
 }
@@ -467,6 +610,16 @@ function updateNav() {
 
 function render() {
     stopCountdownTimer();
+    updateStorylineFilterVisibility();
+
+    // On mobile, lazily anchor the 7-day window at today and align
+    // currentMonth to the midpoint's month. If that shifts the month,
+    // trigger a refetch and bail — loadSchedule will call render() again.
+    if (isMobile() && initMobileWindowIfNeeded()) {
+        loadSchedule();
+        return;
+    }
+    updateNav();
 
     var games = currentSport === "all"
         ? allGames
@@ -504,10 +657,22 @@ function render() {
 // ═════════════════════════════════════════════════════════════════
 
 function renderCalendar(games) {
+    // Apply the active storyline filter (scoped to the Calendar view —
+    // Today / Playoffs / Tables are rendered unfiltered).
+    var filtered = games;
+    if (activeStorylineId) {
+        filtered = games.filter(function(g) {
+            if (!g.storylines || !g.storylines.length) return false;
+            for (var i = 0; i < g.storylines.length; i++) {
+                if (g.storylines[i].id === activeStorylineId) return true;
+            }
+            return false;
+        });
+    }
     if (isMobile()) {
-        renderMobileCalendar(games);
+        renderMobileCalendar(filtered);
     } else {
-        renderDesktopCalendar(games);
+        renderDesktopCalendar(filtered);
     }
 }
 
@@ -569,6 +734,30 @@ function renderDesktopCalendar(games) {
         calGrid.appendChild(cell);
     });
 
+    // On the first desktop render after page load, scroll the row
+    // containing today to the top of the viewport so the user lands
+    // on "now" instead of week 1 of the padded calendar. Skipped
+    // when today is already in the first row (e.g., early in the
+    // month) or not present in this month at all.
+    if (!initialScrollDone) {
+        initialScrollDone = true;
+        // Defer one frame so the browser has a chance to lay out the
+        // grid before we compute target positions.
+        requestAnimationFrame(function() {
+            var todayCell = calGrid.querySelector(".day-cell.is-today");
+            var firstCell = calGrid.querySelector(".day-cell");
+            if (!todayCell || !firstCell || todayCell === firstCell) return;
+            var todayTop = todayCell.getBoundingClientRect().top;
+            var firstTop = firstCell.getBoundingClientRect().top;
+            // Same row → same y-offset. Skip if today is in row 1.
+            if (todayTop - firstTop > 5) {
+                todayCell.scrollIntoView({
+                    block: "start", behavior: "auto",
+                });
+            }
+        });
+    }
+
     // Detail panel for the selected date
     renderDetail(games);
 }
@@ -579,7 +768,7 @@ function renderMobileCalendar(games) {
     hide(detPanel);
     calGrid.className = "mobile-calendar";
 
-    var dates = twoWeekDates();
+    var dates = mobileWindowDates();
     var gbd = groupByDay(games);
     var today = todayStr();
 
@@ -938,6 +1127,25 @@ function buildCard(g) {
     // Post-Season tag — separate from tier, stacks next to it
     if (g.is_playoff) {
         meta.appendChild(el("span", "tier post-season", "post-season"));
+    }
+
+    // Storyline pills — gold-outlined, cap 3 visible + overflow counter
+    if (g.storylines && g.storylines.length) {
+        var maxPills = 3;
+        var shown = g.storylines.slice(0, maxPills);
+        shown.forEach(function(sl) {
+            var pill = el("span", "sl-pill", sl.label);
+            pill.title = sl.label;
+            meta.appendChild(pill);
+        });
+        var overflow = g.storylines.length - maxPills;
+        if (overflow > 0) {
+            var moreLabels = g.storylines.slice(maxPills)
+                .map(function(s) { return s.label; }).join(", ");
+            var more = el("span", "sl-pill more", "+" + overflow);
+            more.title = moreLabels;
+            meta.appendChild(more);
+        }
     }
 
     meta.appendChild(el("span", "gc-league", g.league_name));
@@ -1561,5 +1769,10 @@ function buildNbaLegend() {
 }
 
 // ── Init ─────────────────────────────────────────────────────────
+// On mobile, anchor the 7-day window at today BEFORE the initial fetch
+// so currentMonth matches the window's midpoint on the first round-trip
+// (avoids a wasted fetch when today is near a month boundary).
+if (isMobile()) initMobileWindowIfNeeded();
 loadSchedule();
 loadStandings();
+loadStorylines();

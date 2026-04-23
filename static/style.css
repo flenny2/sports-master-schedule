@@ -607,6 +607,46 @@ header {
     color: var(--football);
 }
 
+/* ── Storyline filter chips (above the calendar) ───────────────── */
+.storyline-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.1rem 0 0.7rem;
+    font-size: 0.7rem;
+}
+
+.storyline-filters.hidden { display: none; }
+
+.sl-filters-label {
+    color: var(--text-3);
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-right: 0.15rem;
+}
+
+.sl-chip {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    padding: 0.22rem 0.65rem;
+    border-radius: 100px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s var(--ease);
+}
+.sl-chip:hover { color: var(--gold); border-color: var(--gold-mid); }
+.sl-chip.active {
+    background: var(--gold-dim);
+    border-color: var(--gold);
+    color: var(--gold);
+}
+
 /* ── Main ─────────────────────────────────────────────────────── */
 main {
     flex: 1;
@@ -961,6 +1001,27 @@ main {
     border: 1px solid var(--major-event);
     box-shadow: 0 0 6px rgba(139, 92, 246, 0.25);
     letter-spacing: 0.08em;
+}
+
+/* Storyline pill — gold outline, rides next to the tier tag */
+.sl-pill {
+    padding: 0.1rem 0.45rem;
+    border-radius: 100px;
+    font-family: var(--font-display);
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    line-height: 1.6;
+    background: var(--gold-dim);
+    color: var(--gold);
+    border: 1px solid var(--gold-mid);
+    white-space: nowrap;
+}
+.sl-pill.more {
+    background: transparent;
+    color: var(--text-3);
+    border-color: var(--border-hl);
 }
 
 .gc-league {
@@ -1794,6 +1855,8 @@ footer {
        header so primary nav is always reachable.  */
     .tab-bar {
         flex-direction: column;
+        align-items: stretch;   /* override desktop's center — let the
+                                   tab row fill the viewport width */
         gap: 0;
         padding: 0;
         background: var(--surface-1);

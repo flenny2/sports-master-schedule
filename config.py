@@ -69,6 +69,38 @@ TITLE_RACES = [
     },
 ]
 
+# ── Storylines ───────────────────────────────────────────────────
+# Storylines are narrative tags applied to games so you can filter the
+# schedule down to one story (e.g., "show only PL title race games").
+# This is a superset of the TITLE_RACES widget — title races stay as a
+# standings comparison on the Tables view; storylines filter the
+# schedule view.
+#
+# Schema per entry:
+#   id          unique string used by the frontend filter
+#   label       display name on chips and pills
+#   description optional longer note (shown in a tooltip, if you add one)
+#   active      bool; set False to hide without deleting
+#   team_ids    list of ESPN team IDs — a game matches if ANY listed
+#               team plays (home or away)
+#   leagues     optional list of league slugs (e.g. ["eng.1"]); if
+#               omitted, any league counts
+#   start_date  optional ISO date "YYYY-MM-DD" — ignore games before
+#   end_date    optional ISO date "YYYY-MM-DD" — ignore games after
+STORYLINES = [
+    {
+        "id": "pl_title_race_25_26",
+        "label": "PL Title Race",
+        "description": "Arsenal vs Man City for the 2025-26 Premier League title",
+        "active": True,
+        "team_ids": ["359", "382"],  # Arsenal, Man City
+        "leagues": ["eng.1"],
+        # No start_date — past title-race fixtures are part of the story.
+        # end_date stops tagging after the season ends.
+        "end_date": "2026-05-31",
+    },
+]
+
 # ── Premier League "Big 6" for detecting top matchups ─────────────
 # When two of these teams play each other, it's flagged as "notable"
 PL_TOP_TEAMS = {
