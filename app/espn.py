@@ -402,6 +402,10 @@ def fetch_soccer_games(start_date, end_date):
     games = []
     seen_ids = set()  # Avoid duplicates across league queries
 
+    # Leagues explicitly excluded from Calendar/Playoffs fetches.
+    # Standings endpoint is unaffected.
+    excluded = getattr(config, "CALENDAR_EXCLUDED_LEAGUES", set()) or set()
+
     # Build a league → {watched team ids} map for pass 2's filter.
     # E.g. {"eng.1": {"359", "382"}, "uefa.champions": {"86", "83", ...}}.
     watched_by_league = {}
@@ -409,6 +413,8 @@ def fetch_soccer_games(start_date, end_date):
         if team["sport"] != "soccer":
             continue
         for league in team["leagues"]:
+            if league in excluded:
+                continue
             watched_by_league.setdefault(league, set()).add(team["espn_id"])
 
     # ── Pass 1: each watched team's schedule endpoint ──
@@ -419,6 +425,8 @@ def fetch_soccer_games(start_date, end_date):
         if team["sport"] != "soccer":
             continue
         for league in team["leagues"]:
+            if league in excluded:
+                continue
             team_league_pairs.append((league, team["espn_id"]))
 
     with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
@@ -764,8 +772,15 @@ def get_title_races():
         if len(contenders) < 2:
             continue
 
-        # Sort by points descending
-        contenders.sort(key=lambda c: c["pts"], reverse=True)
+        # Sort by current standings rank (1 = leader). ESPN's rank
+        # already bakes in tiebreakers (goal diff, goals scored, H2H),
+        # so this is stable even when contenders are level on points.
+        def _rank_key(c):
+            try:
+                return int(c["rank"])
+            except (ValueError, TypeError):
+                return 99
+        contenders.sort(key=_rank_key)
         leader = contenders[0]
         challenger = contenders[1]
 

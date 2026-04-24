@@ -69,9 +69,11 @@ def _matches(storyline, game, tz):
 
 def tag_storylines(games):
     """
-    Set `storylines` on each game: a list of {"id", "label"} dicts,
-    one per matched storyline. Games matching none get an empty list.
-    Modifies games in place and returns them.
+    Set `storylines` on each game: a list of {"id", "label", "logo_url"}
+    dicts, one per matched storyline. Games matching none get an empty
+    list. `logo_url` is included when the storyline config provides one;
+    the frontend renders it inside a cream disc on the pill, or falls
+    back to text-only.
     """
     tz = pytz.timezone(config.TIMEZONE)
     storylines = getattr(config, "STORYLINES", []) or []
@@ -79,7 +81,10 @@ def tag_storylines(games):
         matched = []
         for sl in storylines:
             if _matches(sl, game, tz):
-                matched.append({"id": sl["id"], "label": sl["label"]})
+                entry = {"id": sl["id"], "label": sl["label"]}
+                if sl.get("logo_url"):
+                    entry["logo_url"] = sl["logo_url"]
+                matched.append(entry)
         game["storylines"] = matched
     return games
 
@@ -90,9 +95,12 @@ def get_active_storylines():
     for sl in getattr(config, "STORYLINES", []) or []:
         if not sl.get("active", True):
             continue
-        out.append({
+        entry = {
             "id": sl["id"],
             "label": sl["label"],
             "description": sl.get("description", ""),
-        })
+        }
+        if sl.get("logo_url"):
+            entry["logo_url"] = sl["logo_url"]
+        out.append(entry)
     return out

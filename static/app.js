@@ -15,7 +15,7 @@
 var now          = new Date();
 var currentYear  = now.getFullYear();
 var currentMonth = now.getMonth() + 1;  // 1-indexed (1=Jan, 12=Dec)
-var currentView  = "week";   // "week" = calendar tab, "today", "tables"
+var currentView  = "week";   // "week" = calendar tab, "playoffs", "tables"
 var currentSport = "all";
 var selectedDate = null;
 var allGames     = [];
@@ -23,9 +23,8 @@ var rangeInfo    = null;     // { start: "YYYY-MM-DD", end: "YYYY-MM-DD" }
 var standingsData = [];
 var standingsLoaded = false;
 var titleRacesData = [];
-var countdownTimer = null;
 var lastMobileState = null;  // track viewport changes
-var storylinesData = [];     // [{id, label, description}]
+var storylinesData = [];     // [{id, label, description, logo_url?}]
 var activeStorylineId = null; // currently-selected filter, or null
 var initialScrollDone = false; // desktop: scroll-to-today only once per load
 var mobileWindowStart = null;  // mobile 7-day window start, "YYYY-MM-DD"
@@ -37,12 +36,12 @@ var monthLabel   = document.getElementById("week-label");
 var btnPrev      = document.getElementById("btn-prev");
 var btnNext      = document.getElementById("btn-next");
 var btnRefresh   = document.getElementById("btn-refresh");
+var btnTheme     = document.getElementById("btn-theme");
 var todayStrip   = document.getElementById("today-strip");
 var tsContent    = document.getElementById("ts-content");
 var calGrid      = document.getElementById("calendar-grid");
 var detPanel     = document.getElementById("detail-panel");
 var weekView     = document.getElementById("week-view");
-var todayView    = document.getElementById("today-view");
 var playoffsView = document.getElementById("playoffs-view");
 var tablesView   = document.getElementById("tables-view");
 var statusMsg    = document.getElementById("status-message");
@@ -295,17 +294,16 @@ btnNext.addEventListener("click", function() {
 
 btnRefresh.addEventListener("click", function() { loadSchedule(true); });
 
-// Clicking the today strip jumps to the Today view
-todayStrip.addEventListener("click", function() {
-    var todayTab = document.querySelector('.tab[data-view="today"]');
-    if (todayTab) todayTab.click();
+// Theme toggle — persist to localStorage so reloads remember the choice.
+// Initial theme was resolved in the <head> inline script (FOUC-safe).
+btnTheme.addEventListener("click", function() {
+    var el = document.documentElement;
+    var next = el.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    el.setAttribute("data-theme", next);
+    try { localStorage.setItem("theme", next); } catch (e) {}
 });
-todayStrip.addEventListener("keydown", function(e) {
-    if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        todayStrip.click();
-    }
-});
+
+// Today strip is PASSIVE — information only. No click handlers.
 
 document.querySelectorAll(".tab").forEach(function(t) {
     t.addEventListener("click", function() {
@@ -386,7 +384,6 @@ window.addEventListener("resize", function() {
 function loadSchedule(refresh) {
     clear(calGrid);
     clear(detPanel);
-    clear(todayView);
     clear(playoffsView);
     clear(tablesView);
     if (refresh) standingsLoaded = false;
@@ -423,7 +420,6 @@ function loadSchedule(refresh) {
         updatePlayoffsTabBadge();
     }).catch(function(err) {
         hide(weekView);
-        hide(todayView);
         clear(statusMsg);
         statusMsg.appendChild(el("div", null, "Failed to load schedule"));
         statusMsg.appendChild(el("div", "hint", err.message));
@@ -542,11 +538,25 @@ function renderStorylineFilters() {
     storylineFilters.appendChild(el("span", "sl-filters-label", "Stories"));
 
     storylinesData.forEach(function(sl) {
-        var chip = el("button", "sl-chip", sl.label);
+        var chip = el("button", "sl-chip");
         chip.type = "button";
         chip.setAttribute("data-storyline-id", sl.id);
         chip.setAttribute("aria-pressed", "false");
         if (sl.description) chip.title = sl.description;
+        // Optional competition logo, rendered inside a cream disc so
+        // multi-color logos read against the ochre chip background.
+        if (sl.logo_url) {
+            var holder = el("span", "sl-logo-holder");
+            var img = document.createElement("img");
+            img.src = sl.logo_url;
+            img.alt = "";
+            img.className = "sl-logo";
+            img.loading = "lazy";
+            img.onerror = function() { holder.remove(); };
+            holder.appendChild(img);
+            chip.appendChild(holder);
+        }
+        chip.appendChild(el("span", null, sl.label));
         chip.addEventListener("click", function() {
             // Click-again clears; only one active at a time
             activeStorylineId =
@@ -609,7 +619,6 @@ function updateNav() {
 // ── Render dispatcher ────────────────────────────────────────────
 
 function render() {
-    stopCountdownTimer();
     updateStorylineFilterVisibility();
 
     // On mobile, lazily anchor the 7-day window at today and align
@@ -627,25 +636,16 @@ function render() {
 
     if (currentView === "week") {
         show(weekView);
-        hide(todayView);
         hide(playoffsView);
         hide(tablesView);
         renderCalendar(games);
-    } else if (currentView === "today") {
-        hide(weekView);
-        show(todayView);
-        hide(playoffsView);
-        hide(tablesView);
-        renderToday(games);
     } else if (currentView === "playoffs") {
         hide(weekView);
-        hide(todayView);
         show(playoffsView);
         hide(tablesView);
         renderPlayoffs(games);
     } else if (currentView === "tables") {
         hide(weekView);
-        hide(todayView);
         hide(playoffsView);
         show(tablesView);
         loadAndRenderTables();
@@ -801,9 +801,7 @@ function renderMobileCalendar(games) {
             day.appendChild(el("div", "mobile-day-off", "No games"));
         } else {
             var gamesDiv = el("div", "mobile-day-games");
-            dg.forEach(function(g) {
-                gamesDiv.appendChild(buildCard(g));
-            });
+            appendGamesWithDayDivider(gamesDiv, dg);
             day.appendChild(gamesDiv);
         }
 
@@ -843,120 +841,34 @@ function renderDetail(games) {
         container.appendChild(el("div", "dp-empty",
             "Nothing scheduled \u2014 enjoy the downtime."));
     } else {
-        dg.forEach(function(g) {
-            container.appendChild(buildCard(g));
-        });
+        appendGamesWithDayDivider(container, dg);
     }
     detPanel.appendChild(container);
 }
 
-// ═════════════════════════════════════════════════════════════════
-// TODAY VIEW — Command Center
-// ═════════════════════════════════════════════════════════════════
-
-function renderToday(games) {
-    clear(todayView);
-    show(todayView);
-
-    var today = todayStr();
-    var gbd = groupByDay(games);
-    var todayGames = gbd[today] || [];
-
-    // Header
-    var head = el("div", "today-head");
-    head.appendChild(el("span", "th-dot"));
-    head.appendChild(el("span", "th-text",
-        fmtDateLong(today).toUpperCase()));
-    todayView.appendChild(head);
-
-    // No games today — show next upcoming game
-    if (todayGames.length === 0) {
-        var nextUp = findNextGame(games);
-        var empty = el("div", "today-empty-state");
-        empty.appendChild(el("div", "today-empty-msg", "No games today"));
-
-        if (nextUp) {
-            var nextBox = el("div", "today-next-up");
-            nextBox.appendChild(el("div", "today-next-label", "Next Up"));
-
-            var matchup = el("div", "today-next-game");
-            appendIf(matchup, logoImg(nextUp.away_team.logo, 22));
-            matchup.appendChild(
-                document.createTextNode(" " + nextUp.away_team.name + " "));
-            matchup.appendChild(el("span", "vs", " @ "));
-            matchup.appendChild(
-                document.createTextNode(" " + nextUp.home_team.name + " "));
-            appendIf(matchup, logoImg(nextUp.home_team.logo, 22));
-            nextBox.appendChild(matchup);
-
-            var nextDateStr = new Date(nextUp.date).toLocaleDateString("en-CA");
-            nextBox.appendChild(el("div", "today-next-meta",
-                nextUp.league_name + " \u00b7 " +
-                fmtDateShort(nextDateStr) + " \u00b7 " +
-                fmtTime(nextUp.date)));
-            empty.appendChild(nextBox);
+/** Append games to a container, injecting a "Coming Up" divider
+ *  when the status transitions from completed to live/upcoming.
+ *  Only fires once per day \u2014 mid-day transition between watched
+ *  results and anticipated matches. No-op when the day is all
+ *  completed (past date) or all upcoming (future date). */
+function appendGamesWithDayDivider(container, games) {
+    var hadPost = false;
+    var injected = false;
+    games.forEach(function(g) {
+        var isPost = g.status === "post";
+        if (hadPost && !isPost && !injected) {
+            var div = el("div", "day-divider");
+            div.appendChild(el("span", "day-divider-label",
+                g.status === "in" ? "Live & Coming Up" : "Coming Up"));
+            container.appendChild(div);
+            injected = true;
         }
-
-        todayView.appendChild(empty);
-        return;
-    }
-
-    // Partition today's games into live / upcoming / completed
-    var live = [], upcoming = [], completed = [];
-    todayGames.forEach(function(g) {
-        if (g.status === "in") live.push(g);
-        else if (g.status === "post") completed.push(g);
-        else upcoming.push(g);
+        if (isPost) hadPost = true;
+        container.appendChild(buildCard(g));
     });
-
-    // Sort upcoming by kickoff time
-    upcoming.sort(function(a, b) { return a.date.localeCompare(b.date); });
-
-    // ── LIVE NOW ──
-    if (live.length > 0) {
-        var liveSection = el("div", "today-section");
-        var liveLabel = el("div", "today-section-label");
-        liveLabel.appendChild(el("span", "live-dot"));
-        liveLabel.appendChild(document.createTextNode("Live Now"));
-        liveSection.appendChild(liveLabel);
-        live.forEach(function(g) {
-            liveSection.appendChild(buildCard(g));
-        });
-        todayView.appendChild(liveSection);
-    }
-
-    // ── COMING UP ──
-    if (upcoming.length > 0) {
-        var upSection = el("div", "today-section");
-        upSection.appendChild(el("div", "today-section-label", "Coming Up"));
-        upcoming.forEach(function(g) {
-            var card = buildCard(g);
-            // Insert countdown before the meta row
-            var cdEl = el("div", "card-countdown",
-                "\u23f1 " + countdownText(g.date));
-            cdEl.setAttribute("data-kickoff", g.date);
-            var meta = card.querySelector(".gc-meta");
-            if (meta) card.insertBefore(cdEl, meta);
-            upSection.appendChild(card);
-        });
-        todayView.appendChild(upSection);
-    }
-
-    // ── COMPLETED ──
-    if (completed.length > 0) {
-        var compSection = el("div", "today-section");
-        compSection.appendChild(el("div", "today-section-label", "Completed"));
-        completed.forEach(function(g) {
-            compSection.appendChild(buildCard(g));
-        });
-        todayView.appendChild(compSection);
-    }
-
-    // Start countdown refresh timer
-    startCountdownTimer();
 }
 
-/** Find the next pre-game across all loaded data */
+/** Find the next pre-game across all loaded data — used by today strip */
 function findNextGame(games) {
     var nowISO = new Date().toISOString();
     var future = games.filter(function(g) {
@@ -964,24 +876,6 @@ function findNextGame(games) {
     });
     future.sort(function(a, b) { return a.date.localeCompare(b.date); });
     return future[0] || null;
-}
-
-function startCountdownTimer() {
-    stopCountdownTimer();
-    countdownTimer = setInterval(function() {
-        document.querySelectorAll(".card-countdown[data-kickoff]")
-            .forEach(function(cdEl) {
-                cdEl.textContent = "\u23f1 " +
-                    countdownText(cdEl.getAttribute("data-kickoff"));
-            });
-    }, 60000); // update every minute
-}
-
-function stopCountdownTimer() {
-    if (countdownTimer) {
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-    }
 }
 
 // ── User Data Persistence ────────────────────────────────────────
@@ -1016,132 +910,113 @@ function saveNotes(gameId, notes) {
 // ═════════════════════════════════════════════════════════════════
 
 function buildCard(g) {
+    var isPost    = g.status === "post";
+    var isLive    = g.status === "in";
+    var isPreGame = g.status === "pre";
+
     var card = el("div", "game-card sport-" + g.sport);
+    if (isPost) card.classList.add("game-card--post");
+    if (g.watched) card.classList.add("game-card--watched");
 
-    // Dim finished games, highlight if user watched
-    if (g.status === "post") {
-        card.classList.add("game-card--post");
-        if (g.watched) card.classList.add("game-card--watched");
-    }
-
-    // Click to expand/collapse detail
+    // Click to expand/collapse detail. Interactive elements inside
+    // (notes textarea, watched button) stopPropagation().
     card.addEventListener("click", function() {
         card.classList.toggle("expanded");
     });
 
-    if (g.status === "post" || g.status === "in") {
+    // Sport-color rail — the singular bold color signal
+    card.appendChild(el("div", "rail"));
+
+    // ── Kicker line: competition · round · broadcast ─────────
+    // Competition + playoff round (if any) combine into a cleaner
+    // label than notes-derived strings. Broadcast trimmed to first
+    // channel only; full list lives in the expanded detail.
+    var kicker = el("div", "gc-kicker");
+    var sportName = g.league_name || "";
+    if (g.playoff_round) sportName += " \u00b7 " + g.playoff_round;
+    else if (g.nfl_slot === "Primetime") sportName += " \u00b7 Primetime";
+    kicker.appendChild(el("span", "sport-name", sportName));
+    var primaryBroadcast = (g.broadcasts && g.broadcasts.length)
+        ? g.broadcasts[0] : "";
+    if (primaryBroadcast) {
+        kicker.appendChild(el("span", "broadcast", primaryBroadcast));
+    }
+    card.appendChild(kicker);
+
+    if (isPost || isLive) {
         // ── Scoreboard layout ────────────────────────────────
-        var sb = el("div", "gc-scoreboard");
+        // Determine loser when scores present (tie → neither loser)
+        var awayScore = (g.score && g.score.away != null) ? parseInt(g.score.away, 10) : null;
+        var homeScore = (g.score && g.score.home != null) ? parseInt(g.score.home, 10) : null;
+        var awayIsLoser = (awayScore != null && homeScore != null && awayScore < homeScore);
+        var homeIsLoser = (awayScore != null && homeScore != null && homeScore < awayScore);
 
-        var awayTeam = el("span", "sb-team away");
-        appendIf(awayTeam, logoImg(g.away_team.logo, 22));
-        awayTeam.appendChild(
-            document.createTextNode(" " + g.away_team.abbreviation));
-        sb.appendChild(awayTeam);
-
-        var score = el("span", "sb-score");
-        score.appendChild(
-            document.createTextNode(g.score ? g.score.away : "0"));
-        score.appendChild(el("span", "sb-dash", "\u2013"));
-        score.appendChild(
-            document.createTextNode(g.score ? g.score.home : "0"));
-        sb.appendChild(score);
-
-        var homeTeam = el("span", "sb-team home");
-        homeTeam.appendChild(
-            document.createTextNode(g.home_team.abbreviation + " "));
-        appendIf(homeTeam, logoImg(g.home_team.logo, 22));
-        sb.appendChild(homeTeam);
+        var sb = el("div", "scoreboard");
+        sb.appendChild(buildScoreRow(g.away_team, awayScore, awayIsLoser));
+        sb.appendChild(buildScoreRow(g.home_team, homeScore, homeIsLoser));
         card.appendChild(sb);
 
-        // Status line
-        if (g.status === "in") {
+        if (isLive) {
             card.appendChild(el("div", "sb-status live", "Live"));
-        } else {
-            card.appendChild(el("div", "sb-status final", "Full Time"));
         }
-
-        // Full team names below score
-        var names = el("div", "gc-meta");
-        names.appendChild(el("span", "gc-league",
-            g.away_team.name + "  vs  " + g.home_team.name));
-        card.appendChild(names);
-
     } else {
         // ── Upcoming layout ──────────────────────────────────
-        var main = el("div", "gc-main");
+        var upcoming = el("div", "upcoming");
+        var teams = el("div", "up-teams");
+        teams.appendChild(buildUpTeamRow(g.away_team));
+        teams.appendChild(el("div", "up-vs", "at"));
+        teams.appendChild(buildUpTeamRow(g.home_team));
+        upcoming.appendChild(teams);
 
-        var info = el("div", null);
-        var matchup = el("div", "gc-matchup");
-        appendIf(matchup, logoImg(g.away_team.logo, 18));
-        matchup.appendChild(
-            document.createTextNode(" " + g.away_team.name));
-        matchup.appendChild(el("span", "vs", " @ "));
-        matchup.appendChild(
-            document.createTextNode(g.home_team.name + " "));
-        appendIf(matchup, logoImg(g.home_team.logo, 18));
-        info.appendChild(matchup);
+        var time = el("div", "up-time");
+        var t = new Date(g.date);
+        var hh = t.toLocaleTimeString("en-US",
+            { hour: "2-digit", minute: "2-digit", hour12: true });
+        // "07:30 AM" → number on top line, " AM PT" in small
+        var parts = hh.split(" ");
+        time.appendChild(document.createTextNode(parts[0]));
+        var ampm = document.createElement("small");
+        ampm.textContent = (parts[1] || "") + " PT";
+        time.appendChild(ampm);
+        upcoming.appendChild(time);
 
-        // Team records (if available from ESPN)
-        if (g.away_team.record || g.home_team.record) {
-            var recLine = el("div", "gc-records");
-            if (g.away_team.record) {
-                recLine.appendChild(el("span", null,
-                    g.away_team.abbreviation +
-                    " (" + g.away_team.record + ")"));
-            }
-            if (g.away_team.record && g.home_team.record) {
-                recLine.appendChild(el("span", "gc-rec-sep", " \u00b7 "));
-            }
-            if (g.home_team.record) {
-                recLine.appendChild(el("span", null,
-                    g.home_team.abbreviation +
-                    " (" + g.home_team.record + ")"));
-            }
-            info.appendChild(recLine);
-        }
-
-        // Broadcast channels (prominent for upcoming games)
-        if (g.broadcasts && g.broadcasts.length) {
-            info.appendChild(el("div", "gc-broadcast",
-                g.broadcasts.join(", ")));
-        }
-
-        main.appendChild(info);
-
-        // Kickoff time
-        var td = el("div", "gc-time");
-        td.appendChild(el("div", "t", fmtTime(g.date)));
-        main.appendChild(td);
-
-        card.appendChild(main);
+        card.appendChild(upcoming);
     }
 
-    // ── Meta row (all statuses) ──────────────────────────────
+    // ── Meta row — tags + story pill + availability ──────────
     var meta = el("div", "gc-meta");
 
     var tierCls = (g.tier || "notable").replace(/_/g, "-");
     var tierTxt = (g.tier || "notable").replace(/_/g, " ");
     meta.appendChild(el("span", "tier " + tierCls, tierTxt));
 
-    // Post-Season tag — separate from tier, stacks next to it
     if (g.is_playoff) {
         meta.appendChild(el("span", "tier post-season", "post-season"));
     }
 
-    // Series context (NBA series state, UCL leg + aggregate).
-    // Muted italic pill — contextual info, not a primary tag.
     if (g.series_summary) {
         meta.appendChild(el("span", "gc-series", g.series_summary));
     }
 
-    // Storyline pills — gold-outlined, cap 3 visible + overflow counter
+    // Storyline pills with competition logo in cream disc holder
     if (g.storylines && g.storylines.length) {
         var maxPills = 3;
         var shown = g.storylines.slice(0, maxPills);
         shown.forEach(function(sl) {
-            var pill = el("span", "sl-pill", sl.label);
+            var pill = el("span", "sl-pill");
             pill.title = sl.label;
+            if (sl.logo_url) {
+                var holder = el("span", "sl-logo-holder");
+                var img = document.createElement("img");
+                img.src = sl.logo_url;
+                img.alt = "";
+                img.className = "sl-logo";
+                img.loading = "lazy";
+                img.onerror = function() { holder.remove(); };
+                holder.appendChild(img);
+                pill.appendChild(holder);
+            }
+            pill.appendChild(el("span", null, sl.label));
             meta.appendChild(pill);
         });
         var overflow = g.storylines.length - maxPills;
@@ -1154,35 +1029,12 @@ function buildCard(g) {
         }
     }
 
-    meta.appendChild(el("span", "gc-league", g.league_name));
-    meta.appendChild(el("span", "gc-sep", "\u00b7"));
-
     var availCls = (g.availability || "can_watch").replace(/_/g, "-");
     var availTxt = (g.availability || "can_watch").replace(/_/g, " ");
     var avail = el("span", "gc-avail " + availCls);
     avail.appendChild(el("span", "gc-avail-dot"));
     avail.appendChild(document.createTextNode(availTxt));
     meta.appendChild(avail);
-
-    // Broadcast channels (for finished/live games in meta row)
-    if (g.status !== "pre" && g.broadcasts && g.broadcasts.length) {
-        meta.appendChild(el("span", "gc-sep", "\u00b7"));
-        meta.appendChild(el("span", "gc-broadcast",
-            g.broadcasts.join(", ")));
-    }
-
-    // Watched toggle (post-game only)
-    if (g.status === "post") {
-        var watchedBtn = el("span", "gc-watched",
-            g.watched ? "\u2713 Watched" : "Watched?");
-        if (g.watched) watchedBtn.classList.add("is-watched");
-        watchedBtn.addEventListener("click", function(e) {
-            e.stopPropagation();
-            var nowWatched = !watchedBtn.classList.contains("is-watched");
-            toggleWatched(g.id, nowWatched, watchedBtn, card);
-        });
-        meta.appendChild(watchedBtn);
-    }
 
     card.appendChild(meta);
 
@@ -1193,25 +1045,22 @@ function buildCard(g) {
     if (g.venue) {
         inner.appendChild(buildDetailRow("Venue", g.venue));
     }
-
     if (g.broadcasts && g.broadcasts.length) {
         inner.appendChild(buildDetailRow("Broadcast",
             g.broadcasts.join(", ")));
     }
-
     if (g.nfl_slot) {
         inner.appendChild(buildDetailRow("Slot", g.nfl_slot));
     }
 
     // Series context — NBA series breakdown, or UCL first-leg score.
-    // First-leg-only soccer games get no row here (compact pill is enough).
     if (g.series_detail) {
         var sd = g.series_detail;
         if (sd.sport === "basketball" && sd.teams && sd.teams.length === 2) {
             var t1 = sd.teams[0];
             var t2 = sd.teams[1];
             var seriesVal = t1.abbr + " " + t1.wins +
-                            "  ·  " + t2.abbr + " " + t2.wins;
+                            "  \u00b7  " + t2.abbr + " " + t2.wins;
             if (sd.best_of) {
                 seriesVal += "  (Best of " + sd.best_of + ")";
             }
@@ -1219,60 +1068,75 @@ function buildCard(g) {
         } else if (sd.sport === "soccer" && sd.leg === 2 && sd.first_leg) {
             var fl = sd.first_leg;
             var flVal = fl.home_abbr + " " + fl.home_score +
-                        "–" + fl.away_score + " " + fl.away_abbr;
+                        "\u2013" + fl.away_score + " " + fl.away_abbr;
             if (fl.date) {
                 var flDate = new Date(fl.date).toLocaleDateString("en-US", {
                     month: "short", day: "numeric"
                 });
-                flVal += "  ·  " + flDate;
+                flVal += "  \u00b7  " + flDate;
             }
             inner.appendChild(buildDetailRow("First Leg", flVal));
         }
     }
 
     if (g.notes) {
-        var notesRow = buildDetailRow("Notes", g.notes);
-        notesRow.querySelector(".gd-val").classList.add("accent");
-        inner.appendChild(notesRow);
+        var notesDetailRow = buildDetailRow("Notes", g.notes);
+        notesDetailRow.querySelector(".gd-val").classList.add("accent");
+        inner.appendChild(notesDetailRow);
     }
 
-    // Standings context (from pre-fetched standings data)
+    // Standings context
     var homeStanding = findTeamStanding(g.home_team.id);
     var awayStanding = findTeamStanding(g.away_team.id);
-
     if (homeStanding || awayStanding) {
-        var parts = [];
+        var parts2 = [];
         if (awayStanding) {
-            parts.push(g.away_team.abbreviation + ": " +
+            parts2.push(g.away_team.abbreviation + ": " +
                 ordinal(awayStanding.rank) + " in " +
                 awayStanding.league);
         }
         if (homeStanding) {
-            parts.push(g.home_team.abbreviation + ": " +
+            parts2.push(g.home_team.abbreviation + ": " +
                 ordinal(homeStanding.rank) + " in " +
                 homeStanding.league);
         }
         inner.appendChild(
-            buildDetailRow("Standings", parts.join("  \u00b7  ")));
+            buildDetailRow("Standings", parts2.join("  \u00b7  ")));
     }
 
-    // Season type context
-    if (g.season_type === 3) {
-        inner.appendChild(buildDetailRow("Round", "Postseason"));
-    } else if (g.season_type === 5) {
-        inner.appendChild(buildDetailRow("Round", "Play-In Tournament"));
+    // Season type context (only when playoff tagger didn't already label it)
+    if (!g.playoff_round) {
+        if (g.season_type === 3) {
+            inner.appendChild(buildDetailRow("Round", "Postseason"));
+        } else if (g.season_type === 5) {
+            inner.appendChild(buildDetailRow("Round", "Play-In Tournament"));
+        }
     }
 
-    // Notes textarea (auto-saves on blur)
+    // Watched toggle — moved from meta row to expanded detail (post-game only)
+    if (isPost) {
+        var watchedRow = el("div", "gd-row");
+        watchedRow.appendChild(el("span", "gd-label", "Your Log"));
+        var watchedBtn = el("button", "gc-watched",
+            g.watched ? "\u2713 Watched" : "Mark Watched");
+        if (g.watched) watchedBtn.classList.add("is-watched");
+        watchedBtn.addEventListener("click", function(e) {
+            e.stopPropagation();
+            var nowWatched = !watchedBtn.classList.contains("is-watched");
+            toggleWatched(g.id, nowWatched, watchedBtn, card);
+        });
+        watchedRow.appendChild(watchedBtn);
+        inner.appendChild(watchedRow);
+    }
+
+    // User notes textarea
     var notesRow = el("div", "gd-notes-row");
     notesRow.appendChild(el("span", "gd-label", "Your Notes"));
     var notesArea = document.createElement("textarea");
     notesArea.className = "gc-notes";
     notesArea.placeholder = "Add notes about this game\u2026";
     notesArea.value = g.user_notes || "";
-    notesArea.addEventListener("click", function(e) {
-        e.stopPropagation();
-    });
+    notesArea.addEventListener("click", function(e) { e.stopPropagation(); });
     notesArea.addEventListener("blur", function() {
         saveNotes(g.id, notesArea.value);
     });
@@ -1283,6 +1147,34 @@ function buildCard(g) {
     card.appendChild(detail);
 
     return card;
+}
+
+// Helpers for the new scoreboard/upcoming layouts
+function buildScoreRow(team, score, isLoser) {
+    var row = el("div", "sb-row");
+    if (isLoser) row.classList.add("loser");
+    var logo = logoImg(team.logo, 36);
+    if (logo) { logo.className = "sb-logo"; row.appendChild(logo); }
+    else {
+        // Placeholder so grid columns stay aligned when no logo
+        row.appendChild(el("span", "sb-logo"));
+    }
+    var info = el("div", "sb-teaminfo");
+    info.appendChild(el("div", "sb-name", team.abbreviation));
+    if (team.record) info.appendChild(el("div", "sb-record", team.record));
+    row.appendChild(info);
+    row.appendChild(el("div", "sb-score",
+        score != null ? String(score) : "0"));
+    return row;
+}
+
+function buildUpTeamRow(team) {
+    var row = el("div", "up-team");
+    var logo = logoImg(team.logo, 36);
+    if (logo) { logo.className = "up-logo"; row.appendChild(logo); }
+    var name = el("span", "up-name", team.name);
+    row.appendChild(name);
+    return row;
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -1495,47 +1387,73 @@ function renderTables(leagues) {
 
 // ── Title Race Widget ────────────────────────────────────────────
 
+/** Build the gap string — uses team abbreviations for scannability.
+ *  Examples:
+ *    "MNC LEAD BY 5 PTS"
+ *    "LEVEL ON POINTS"
+ *    "LEVEL ON POINTS · ARS HAVE 1 GAME IN HAND"
+ *    "ARS LEAD BY 2 PTS · MNC HAVE 2 GAMES IN HAND"
+ */
+function buildGapString(race) {
+    var leader = race.contenders[0];
+    var chaser = race.contenders[1];
+    var gap = race.gap;
+    var gih = race.games_in_hand;
+    var parts = [];
+
+    if (gap > 0) {
+        parts.push(leader.team.abbr + " LEAD BY " + gap +
+            " PT" + (gap !== 1 ? "S" : ""));
+    } else if (gap < 0) {
+        var absGap = Math.abs(gap);
+        parts.push(chaser.team.abbr + " LEAD BY " + absGap +
+            " PT" + (absGap !== 1 ? "S" : ""));
+    } else {
+        parts.push("LEVEL ON POINTS");
+    }
+
+    // games_in_hand = leader.gp - chaser.gp. Positive → chaser has
+    // played fewer games (games in hand). Negative → leader has fewer.
+    if (gih > 0) {
+        parts.push(chaser.team.abbr + " HAVE " + gih +
+            " GAME" + (gih !== 1 ? "S" : "") + " IN HAND");
+    } else if (gih < 0) {
+        var absGih = Math.abs(gih);
+        parts.push(leader.team.abbr + " HAVE " + absGih +
+            " GAME" + (absGih !== 1 ? "S" : "") + " IN HAND");
+    }
+
+    return parts.join(" · ");
+}
+
 function buildTitleRace(race) {
     var widget = el("div", "race-widget");
 
-    // Header
+    // Header \u2014 label + context-aware gap string with team abbreviations.
+    // Backend sorts contenders by standings rank ascending (leader first),
+    // so contenders[0] is the genuine leader.
     var head = el("div", "race-head");
     head.appendChild(el("span", "race-label", race.label));
-    var gapText = race.gap + " point" + (race.gap !== 1 ? "s" : "");
-    if (race.games_in_hand > 0) {
-        gapText += " \u00b7 " + race.contenders[1].team.name + " have " +
-            race.games_in_hand +
-            " game" + (race.games_in_hand !== 1 ? "s" : "") + " in hand";
-    } else if (race.games_in_hand < 0) {
-        gapText += " \u00b7 " + race.contenders[0].team.name + " have " +
-            Math.abs(race.games_in_hand) +
-            " game" + (Math.abs(race.games_in_hand) !== 1 ? "s" : "") +
-            " in hand";
-    }
-    head.appendChild(el("span", "race-gap", gapText));
+    head.appendChild(el("span", "race-gap", buildGapString(race)));
     widget.appendChild(head);
 
-    // Contender rows
+    // Contender rows (3 stats: PTS / GP / LEFT \u2014 the actionable trio)
     var body = el("div", "race-body");
     race.contenders.forEach(function(c, idx) {
         var row = el("div",
             "race-row" + (idx === 0 ? " race-leader" : ""));
 
-        // Rank + logo + team name
         var team = el("div", "race-team");
         team.appendChild(el("span", "race-rank", c.rank + "."));
-        appendIf(team, logoImg(c.team.logo, 22));
+        appendIf(team, logoImg(c.team.logo, 28));
         team.appendChild(el("span", "race-name", c.team.name));
         row.appendChild(team);
 
-        // Stats
         var stats = el("div", "race-stats");
         var statItems = [
-            { val: c.pts, label: "Pts" },
-            { val: c.gp, label: "GP" },
-            { val: c.remaining, label: "Left" },
-            { val: c.max_pts, label: "Max" },
-            { val: c.ppg, label: "PPG" }
+            { val: c.pts,       label: "Pts" },
+            { val: c.gp,        label: "GP" },
+            { val: c.remaining, label: "Left" }
         ];
         statItems.forEach(function(s) {
             var box = el("div", "race-stat");
@@ -1547,11 +1465,10 @@ function buildTitleRace(race) {
         });
         row.appendChild(stats);
 
-        // Upcoming fixtures
         if (c.upcoming && c.upcoming.length > 0) {
             var fixtures = el("div", "race-fixtures");
             fixtures.appendChild(
-                el("span", "race-fix-label", "Next:"));
+                el("span", "race-fix-label", "Next"));
             c.upcoming.forEach(function(f) {
                 var fix = el("span", "race-fix");
                 var prefix = f.home ? "vs " : "@ ";

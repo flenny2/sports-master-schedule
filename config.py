@@ -87,6 +87,10 @@ TITLE_RACES = [
 #               omitted, any league counts
 #   start_date  optional ISO date "YYYY-MM-DD" — ignore games before
 #   end_date    optional ISO date "YYYY-MM-DD" — ignore games after
+#   logo_url    optional competition logo URL; rendered inside a cream
+#               disc on the ochre storyline chip. Falls back to text-only
+#               pill when omitted. Typical source: ESPN CDN
+#               (https://a.espncdn.com/i/leaguelogos/soccer/500/<id>.png).
 STORYLINES = [
     {
         "id": "pl_title_race_25_26",
@@ -95,11 +99,22 @@ STORYLINES = [
         "active": True,
         "team_ids": ["359", "382"],  # Arsenal, Man City
         "leagues": ["eng.1"],
+        "logo_url": "https://a.espncdn.com/i/leaguelogos/soccer/500/23.png",
         # No start_date — past title-race fixtures are part of the story.
         # end_date stops tagging after the season ends.
         "end_date": "2026-05-31",
     },
 ]
+
+# ── Leagues hidden from Calendar / Playoffs default views ────────
+# Games in these leagues are NOT fetched when building the schedule,
+# even if a watched team is in them. Standings (Tables tab) are
+# unaffected — the league stays fully visible there. Add a league
+# slug here to declutter the Calendar without uninstalling the team
+# (e.g., Bayern stays in WATCHED_TEAMS so their UCL games still
+# surface via uefa.champions; only the Bundesliga league matches
+# are suppressed here).
+CALENDAR_EXCLUDED_LEAGUES = {"ger.1", "esp.1"}
 
 # ── Premier League "Big 6" for detecting top matchups ─────────────
 # When two of these teams play each other, it's flagged as "notable"
