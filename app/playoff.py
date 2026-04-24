@@ -2,14 +2,14 @@
 Playoff / finals tagger.
 
 Flags each game with `is_playoff` (true/false) and, when possible, a
-human-readable `playoff_round` (e.g. "NBA Finals", "Quarterfinal").
+human-readable `playoff_round` (e.g. "NBA Finals", "Quarterfinals").
 
-Rules:
-  NBA:    all fetched games are already playoff/play-in.
-  NFL:    season_type == 3 (postseason).
-  Soccer: knockout-only cup competitions (FA Cup, League Cup, Copa del
-          Rey, DFB-Pokal, Conference League), or any UCL/Europa game
-          whose notes contain a knockout-round keyword.
+Soccer triggers are belt-and-suspenders — any one is sufficient:
+  1. League is in KNOCKOUT_CUP_LEAGUES (FA Cup etc. are knockout throughout)
+  2. Notes contain a knockout keyword (covers legacy/text-only responses)
+  3. raw_series.title is in KNOWN_KNOCKOUT_ROUND_TITLES (structured, stable)
+
+NBA/NFL are flagged by season_type.
 """
 
 # Soccer competitions where every fixture is a knockout tie
@@ -38,9 +38,29 @@ KNOCKOUT_NOTE_KEYWORDS = (
     "conference",
 )
 
+# Structured round titles ESPN uses in `competition.series.title` across
+# UCL, Europa, Conference League, and similarly-shaped cup competitions.
+# This is the most reliable trigger — structured data, stable across
+# notes-format changes. Used both to flag is_playoff and to name the
+# round (avoids the "1st Leg" / "2nd Leg - X advance Y-Z" ugliness that
+# would otherwise land in `playoff_round`).
+KNOWN_KNOCKOUT_ROUND_TITLES = {
+    "Round of 16",
+    "Quarterfinals",
+    "Semifinals",
+    "Final",
+    "Knockout Round Playoffs",
+}
 
-def _detect_round(notes, sport, league, season_type):
+
+def _detect_round(notes, sport, league, season_type, series_title=""):
     """Return a short round label, or empty string if we can't tell."""
+    # Prefer the structured title when ESPN gives us one — it reads
+    # cleaner ("Quarterfinals") than the raw notes for two-leg ties
+    # ("1st Leg" / "2nd Leg - X advance Y-Z on aggregate").
+    t = (series_title or "").strip()
+    if t in KNOWN_KNOCKOUT_ROUND_TITLES:
+        return t
     n = (notes or "").strip()
     if n:
         return n  # ESPN already gives us "Quarterfinal", "NBA Finals", etc.
@@ -62,6 +82,7 @@ def tag_playoff(games):
         league = game.get("league", "")
         season_type = game.get("season_type", 2)
         notes = game.get("notes", "")
+        series_title = (game.get("raw_series") or {}).get("title", "")
 
         is_playoff = False
 
@@ -73,6 +94,10 @@ def tag_playoff(games):
         elif sport == "soccer":
             if league in KNOCKOUT_CUP_LEAGUES:
                 is_playoff = True
+            elif series_title in KNOWN_KNOCKOUT_ROUND_TITLES:
+                # Structured trigger: any cup with these round titles
+                # (UCL, Europa, Conference, etc.) is a knockout tie.
+                is_playoff = True
             else:
                 notes_lower = notes.lower()
                 if any(kw in notes_lower for kw in KNOCKOUT_NOTE_KEYWORDS):
@@ -80,7 +105,7 @@ def tag_playoff(games):
 
         game["is_playoff"] = is_playoff
         game["playoff_round"] = (
-            _detect_round(notes, sport, league, season_type)
+            _detect_round(notes, sport, league, season_type, series_title)
             if is_playoff else ""
         )
 

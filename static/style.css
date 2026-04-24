@@ -1003,6 +1003,24 @@ main {
     letter-spacing: 0.08em;
 }
 
+/* Series context — muted italic pill for series state / leg+aggregate.
+   Intentionally quieter than the tier/post-season tags: it's contextual
+   info ("LAL lead series 2-1", "2nd Leg · ARS lead 1-0"), not a label. */
+.gc-series {
+    padding: 0.08rem 0.4rem;
+    border-radius: 3px;
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    font-style: italic;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--text-2);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    line-height: 1.6;
+}
+
 /* Storyline pill — gold outline, rides next to the tier tag */
 .sl-pill {
     padding: 0.1rem 0.45rem;

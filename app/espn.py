@@ -185,6 +185,13 @@ def _parse_game(event, sport, league_slug):
         # Season type: 1=preseason, 2=regular, 3=postseason, 5=play-in (NBA)
         season_type = event.get("season", {}).get("type", 2)
 
+        # Raw playoff-series metadata (used by series_context tagger).
+        # NBA: {summary, totalCompetitions, competitors: [{id, wins}], ...}
+        # Soccer two-leg: {title, competitors: [{id, aggregateScore}], ...}
+        # Empty/missing for non-playoff games, NBA play-in, and single-leg ties.
+        raw_series = competition.get("series") or None
+        raw_leg = competition.get("leg") or None
+
         return {
             "id": event.get("id", ""),
             "sport": sport,
@@ -202,6 +209,8 @@ def _parse_game(event, sport, league_slug):
             "score": score,
             "notes": notes,
             "season_type": season_type,
+            "raw_series": raw_series,
+            "raw_leg": raw_leg,
             # tier and availability get set later by importance.py / availability.py
             "tier": None,
             "availability": None,
@@ -266,6 +275,61 @@ def fetch_scoreboard(sport, league_slug, date_str=None):
         if game:
             games.append(game)
     return games
+
+
+# ── First-leg lookup (two-leg soccer ties) ───────────────────────
+
+def fetch_first_leg(league_slug, home_id, away_id, round_title, second_leg_date):
+    """
+    Find the 1st leg of a two-leg soccer tie.
+
+    Scans the same league's scoreboard for a 14-day window ending the day
+    before the 2nd leg. The 1st leg is usually ~7 days earlier, but we
+    pad the window to be safe. Matching: same two team IDs (either side)
+    and same round title (from series.title) when available.
+
+    Returns the parsed game dict for the 1st leg, or None if not found.
+
+    Caveat for past fixtures: a watched team's past UCL games arrive via
+    fetch_team_schedule (pass 1 in fetch_soccer_games), which does NOT
+    populate series / leg / notes in ESPN's response. If the 2nd leg
+    itself arrived via that path, this lookup can still succeed because
+    we key on team IDs — but the CALLER won't know it's a 2nd leg in the
+    first place (raw_leg is None). Net effect: historical UCL games end
+    up rendering with the round name only and no aggregate line. The
+    score is already visible on the card, so this is acceptable — don't
+    re-plumb team-schedule parsing just to recover it.
+    """
+    # Build a date-range scoreboard query: [second_leg - 14d, second_leg - 1d]
+    try:
+        end_day = second_leg_date - timedelta(days=1)
+        start_day = second_leg_date - timedelta(days=14)
+    except (TypeError, AttributeError):
+        return None
+
+    date_range = f"{start_day.strftime('%Y%m%d')}-{end_day.strftime('%Y%m%d')}"
+    candidates = fetch_scoreboard("soccer", league_slug, date_range)
+
+    target_pair = {home_id, away_id}
+    target_round = (round_title or "").strip().lower()
+
+    for game in candidates:
+        pair = {game["home_team"]["id"], game["away_team"]["id"]}
+        if pair != target_pair:
+            continue
+        # If we know the round, prefer matches from the same round.
+        # (Round titles come from series.title — "Round of 16" etc.)
+        if target_round:
+            game_round = (
+                (game.get("raw_series") or {}).get("title") or ""
+            ).strip().lower()
+            if game_round and game_round != target_round:
+                continue
+        # Prefer a completed 1st leg (status == "post"), but return the
+        # candidate even if it's still pending — the caller decides.
+        return game
+
+    return None
 
 
 # ── Sport-specific fetchers ───────────────────────────────────────

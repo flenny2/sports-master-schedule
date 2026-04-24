@@ -1129,6 +1129,12 @@ function buildCard(g) {
         meta.appendChild(el("span", "tier post-season", "post-season"));
     }
 
+    // Series context (NBA series state, UCL leg + aggregate).
+    // Muted italic pill — contextual info, not a primary tag.
+    if (g.series_summary) {
+        meta.appendChild(el("span", "gc-series", g.series_summary));
+    }
+
     // Storyline pills — gold-outlined, cap 3 visible + overflow counter
     if (g.storylines && g.storylines.length) {
         var maxPills = 3;
@@ -1195,6 +1201,33 @@ function buildCard(g) {
 
     if (g.nfl_slot) {
         inner.appendChild(buildDetailRow("Slot", g.nfl_slot));
+    }
+
+    // Series context — NBA series breakdown, or UCL first-leg score.
+    // First-leg-only soccer games get no row here (compact pill is enough).
+    if (g.series_detail) {
+        var sd = g.series_detail;
+        if (sd.sport === "basketball" && sd.teams && sd.teams.length === 2) {
+            var t1 = sd.teams[0];
+            var t2 = sd.teams[1];
+            var seriesVal = t1.abbr + " " + t1.wins +
+                            "  ·  " + t2.abbr + " " + t2.wins;
+            if (sd.best_of) {
+                seriesVal += "  (Best of " + sd.best_of + ")";
+            }
+            inner.appendChild(buildDetailRow("Series", seriesVal));
+        } else if (sd.sport === "soccer" && sd.leg === 2 && sd.first_leg) {
+            var fl = sd.first_leg;
+            var flVal = fl.home_abbr + " " + fl.home_score +
+                        "–" + fl.away_score + " " + fl.away_abbr;
+            if (fl.date) {
+                var flDate = new Date(fl.date).toLocaleDateString("en-US", {
+                    month: "short", day: "numeric"
+                });
+                flVal += "  ·  " + flDate;
+            }
+            inner.appendChild(buildDetailRow("First Leg", flVal));
+        }
     }
 
     if (g.notes) {

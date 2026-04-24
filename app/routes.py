@@ -13,6 +13,7 @@ from app.espn import get_all_games, get_all_standings, get_title_races, clear_ca
 from app.importance import tag_importance
 from app.availability import tag_availability
 from app.playoff import tag_playoff
+from app.series_context import tag_series_context
 from app.storylines import tag_storylines, get_active_storylines
 from app.userdata import get_all_userdata, set_watched, set_notes
 
@@ -122,6 +123,7 @@ def api_schedule():
     games = tag_importance(games)
     games = tag_availability(games)
     games = tag_playoff(games)
+    games = tag_series_context(games)
     games = tag_storylines(games)
 
     # Merge in user data (watched flags, notes)
