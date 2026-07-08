@@ -130,7 +130,7 @@ PL_TOP_TEAMS = {
 # ── NFL settings ──────────────────────────────────────────────────
 # We show all primetime games (TNF, SNF, MNF) and flag RedZone on Sundays.
 # Primetime is detected by game time (evening UTC) + national broadcast.
-NFL_PRIMETIME_NETWORKS = {"NBC", "Peacock", "ESPN", "ABC", "Prime Video", "Amazon"}
+NFL_PRIMETIME_NETWORKS = {"NBC", "Peacock", "ESPN", "ABC", "Prime Video", "Amazon", "Netflix"}
 
 # ── NBA settings ──────────────────────────────────────────────────
 # Show playoff games (season type 3) and nationally televised regular season.
