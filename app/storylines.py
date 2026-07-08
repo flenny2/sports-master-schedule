@@ -91,9 +91,18 @@ def tag_storylines(games):
 
 def get_active_storylines():
     """Return active storylines in the shape the frontend needs."""
+    today = datetime.now(pytz.timezone(config.TIMEZONE)).date()
     out = []
     for sl in getattr(config, "STORYLINES", []) or []:
         if not sl.get("active", True):
+            continue
+        # Date-window gate — mirror _matches so an expired (or not-yet-started)
+        # storyline stops serving its chip, not just tagging games. Without
+        # this, an active storyline past its end_date still ships a filter
+        # chip that matches zero games (the dead PL Title Race bug).
+        start = _parse_iso_date(sl.get("start_date"))
+        end = _parse_iso_date(sl.get("end_date"))
+        if (end and today > end) or (start and today < start):
             continue
         entry = {
             "id": sl["id"],

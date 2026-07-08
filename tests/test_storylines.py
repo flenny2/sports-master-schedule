@@ -161,3 +161,44 @@ def test_get_active_storylines_shape(monkeypatch):
         "label": "PL Title Race",
         "description": "Arsenal vs Man City",
     }]
+
+
+def test_get_active_storylines_hides_expired_chip(monkeypatch):
+    """An active storyline whose end_date is in the past must be hidden.
+
+    Reproduces the dead-chip bug: the tagger stops matching games past
+    end_date, so serving the chip filters the calendar to zero games.
+    Far-past date keeps this test from going stale over time.
+    """
+    monkeypatch.setattr(config, "STORYLINES", [
+        {"id": "expired", "label": "Expired", "active": True,
+         "team_ids": ["359"], "end_date": "2020-01-01"},
+    ])
+    assert get_active_storylines() == []
+
+
+def test_get_active_storylines_includes_future_end_date(monkeypatch):
+    """A storyline whose window is still open (far-future end) is served."""
+    monkeypatch.setattr(config, "STORYLINES", [
+        {"id": "live", "label": "Live", "active": True,
+         "team_ids": ["359"], "end_date": "2099-12-31"},
+    ])
+    assert [s["id"] for s in get_active_storylines()] == ["live"]
+
+
+def test_get_active_storylines_hides_not_yet_started(monkeypatch):
+    """A storyline whose start_date is far in the future is not yet served."""
+    monkeypatch.setattr(config, "STORYLINES", [
+        {"id": "upcoming", "label": "Upcoming", "active": True,
+         "team_ids": ["359"], "start_date": "2099-01-01"},
+    ])
+    assert get_active_storylines() == []
+
+
+def test_get_active_storylines_no_window_is_unbounded(monkeypatch):
+    """A storyline with no date window is always served while active."""
+    monkeypatch.setattr(config, "STORYLINES", [
+        {"id": "always", "label": "Always", "active": True,
+         "team_ids": ["359"]},
+    ])
+    assert [s["id"] for s in get_active_storylines()] == ["always"]
