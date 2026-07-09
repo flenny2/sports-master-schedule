@@ -185,6 +185,10 @@ def _parse_game(event, sport, league_slug):
         # Season type: 1=preseason, 2=regular, 3=postseason, 5=play-in (NBA)
         season_type = event.get("season", {}).get("type", 2)
 
+        # WC/tournament round labels live in season.slug (e.g. "round-of-16"),
+        # NOT in notes/series — capture it so playoff.py can tag knockout rounds.
+        season_slug = event.get("season", {}).get("slug", "")
+
         # Raw playoff-series metadata (used by series_context tagger).
         # NBA: {summary, totalCompetitions, competitors: [{id, wins}], ...}
         # Soccer two-leg: {title, competitors: [{id, aggregateScore}], ...}
@@ -209,6 +213,7 @@ def _parse_game(event, sport, league_slug):
             "score": score,
             "notes": notes,
             "season_type": season_type,
+            "season_slug": season_slug,
             "raw_series": raw_series,
             "raw_leg": raw_leg,
             # tier and availability get set later by importance.py / availability.py
@@ -476,6 +481,19 @@ def fetch_soccer_games(start_date, end_date):
                     seen_ids.add(game["id"])
                     games.append(game)
 
+    # ── Pass 3: followed competitions (full tournament follows) ──
+    # For competitions with no club teams in WATCHED_TEAMS (e.g. the World Cup),
+    # fetch EVERY fixture regardless of watched teams. Reuses pass 2's date_range.
+    # A few slugs at most, so a plain loop is simpler than a thread pool.
+    followed = getattr(config, "FOLLOWED_COMPETITIONS", []) or []
+    for slug in followed:
+        if slug in excluded:
+            continue
+        for game in fetch_scoreboard("soccer", slug, date_range):
+            if game["id"] not in seen_ids:
+                seen_ids.add(game["id"])
+                games.append(game)
+
     # Filter to requested date range
     return _filter_to_date_range(games, start_date, end_date)
 
@@ -667,6 +685,7 @@ def get_all_standings():
         ("soccer", "esp.1"),
         ("soccer", "ger.1"),
         ("soccer", "uefa.champions"),
+        ("soccer", "fifa.world"),  # World Cup — 12 group tables (A–L)
         ("basketball", "nba"),
     ]
 

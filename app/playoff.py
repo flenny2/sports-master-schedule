@@ -52,9 +52,22 @@ KNOWN_KNOCKOUT_ROUND_TITLES = {
     "Knockout Round Playoffs",
 }
 
+# World Cup (and similar) round labels live in event.season.slug, not in
+# notes/series. "group-stage" is round-robin (NOT knockout); everything else is.
+WORLD_CUP_ROUND_SLUGS = {
+    "round-of-32": "Round of 32",
+    "round-of-16": "Round of 16",
+    "quarterfinals": "Quarterfinals",
+    "semifinals": "Semifinals",
+    "final": "Final",
+}
 
-def _detect_round(notes, sport, league, season_type, series_title=""):
+
+def _detect_round(notes, sport, league, season_type, series_title="", season_slug=""):
     """Return a short round label, or empty string if we can't tell."""
+    # World Cup rounds carry the cleanest label in the slug ("Quarterfinals").
+    if season_slug in WORLD_CUP_ROUND_SLUGS:
+        return WORLD_CUP_ROUND_SLUGS[season_slug]
     # Prefer the structured title when ESPN gives us one — it reads
     # cleaner ("Quarterfinals") than the raw notes for two-leg ties
     # ("1st Leg" / "2nd Leg - X advance Y-Z on aggregate").
@@ -81,6 +94,7 @@ def tag_playoff(games):
         sport = game.get("sport", "")
         league = game.get("league", "")
         season_type = game.get("season_type", 2)
+        season_slug = game.get("season_slug", "")
         notes = game.get("notes", "")
         series_title = (game.get("raw_series") or {}).get("title", "")
 
@@ -92,7 +106,11 @@ def tag_playoff(games):
         elif sport == "football":
             is_playoff = season_type == 3
         elif sport == "soccer":
-            if league in KNOCKOUT_CUP_LEAGUES:
+            if season_slug in WORLD_CUP_ROUND_SLUGS:
+                # World Cup knockout round (label lives in season.slug).
+                # "group-stage" is round-robin and correctly not in the map.
+                is_playoff = True
+            elif league in KNOCKOUT_CUP_LEAGUES:
                 is_playoff = True
             elif series_title in KNOWN_KNOCKOUT_ROUND_TITLES:
                 # Structured trigger: any cup with these round titles
@@ -105,7 +123,7 @@ def tag_playoff(games):
 
         game["is_playoff"] = is_playoff
         game["playoff_round"] = (
-            _detect_round(notes, sport, league, season_type, series_title)
+            _detect_round(notes, sport, league, season_type, series_title, season_slug)
             if is_playoff else ""
         )
 
