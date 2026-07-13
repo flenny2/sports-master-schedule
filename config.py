@@ -116,6 +116,11 @@ STORYLINES = [
 # are suppressed here).
 CALENDAR_EXCLUDED_LEAGUES = {"ger.1", "esp.1"}
 
+# Competitions to follow in FULL — every fixture is fetched regardless of
+# whether a watched team is playing. Use for whole-tournament follows where
+# there are no club teams to track (e.g. the World Cup, national teams).
+FOLLOWED_COMPETITIONS = ["fifa.world"]  # fifa.world is a `soccer` slug
+
 # ── Premier League "Big 6" for detecting top matchups ─────────────
 # When two of these teams play each other, it's flagged as "notable"
 PL_TOP_TEAMS = {
@@ -151,6 +156,7 @@ LEAGUE_NAMES = {
     "uefa.europa": "Europa League",
     "uefa.europa.conf": "Conference League",
     "fifa.cwc": "Club World Cup",
+    "fifa.world": "FIFA World Cup",
     "nfl": "NFL",
     "nba": "NBA",
 }
