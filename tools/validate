@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Uniform validation entrypoint (workspace convention, 2026-07-12).
+# Any agent or human runs ./tools/validate — no repo-specific knowledge needed.
+set -e
+cd "$(dirname "$0")/.."
+python3 -m pytest -q
+echo "VALIDATE PASS"
