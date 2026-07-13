@@ -1,5 +1,10 @@
 # Sports Master Schedule
 
+what: personal sports schedule tracker — upcoming games filtered by interest + work availability; Flask + vanilla HTML/CSS/JS, ESPN public API, in-memory cache, no DB and no build step
+rules: docs describe `master` only; NEVER `git push` (push = Render auto-deploy — the queue runner branches, shipping is Dylan's call); run `./tools/validate` before shipping; add every themed CSS token in BOTH light + dark blocks
+links: deploy config `render.yaml` (Render free tier); repo idea/task inbox `TODOS.md`; UI/style reference `personal-style-tracker/`
+updated: 2026-07-13
+
 Personal sports schedule tracker — shows upcoming games filtered by interest level and availability. Visual direction is editorial/broadsheet: cream newsprint in light mode, warm coffee-black in dark mode, bold sport-colour accents.
 
 ## Tech Stack
@@ -35,6 +40,7 @@ Server runs on http://localhost:5000 with debug/auto-reload enabled.
 - **Storylines** are configured in `config.STORYLINES` and filter the Calendar view (chip row above grid + gold pills on matching cards). Each entry can carry an optional `logo_url` — frontend renders the logo inside a cream disc holder on the ochre pill, or falls back to text-only. Separate from `TITLE_RACES`, which stays as the Tables-view widget
 - **Series context**: `app/series_context.py` adds `series_summary` + `series_detail` to every playoff game (NBA series score, UCL leg + aggregate). Runs after `tag_playoff` and short-circuits on non-playoff games
 - **CALENDAR_EXCLUDED_LEAGUES** (in `config.py`): set of league slugs hidden from Calendar/Playoffs fetches. Standings endpoint is unaffected so the league stays visible on the Tables tab. Currently seeded `{"ger.1", "esp.1"}` — Bundesliga and La Liga. Watched teams in those leagues still surface via their UEFA competitions
+- **Followed competitions (full-tournament follow)**: `config.FOLLOWED_COMPETITIONS` (currently `["fifa.world"]` — FIFA World Cup 2026) fetches EVERY fixture in the window regardless of watched teams. Use for whole-tournament follows with no club team to track (national-team events). Implemented as "Pass 3" in the soccer fetcher (`app/espn.py`), after the watched-team and top-matchup passes, reusing the same date-range scoreboard call; a plain loop, not a thread pool, since it's a few slugs at most. World Cup standings also surface on the Tables tab (12 group tables A–L). **Status**: functional support is merged on `master` (schedule + standings + knockout tagging); the visual/design overhaul (more logos, colour, spacing/alignment fixes) is filed in `TODOS.md`, NOT yet built
 - **Month view cold load**: ~22 soccer API calls (one scoreboard range query per watched league + per-team schedules for past games); cache makes repeat visits instant
 - **Desktop vs mobile calendar**: desktop renders `calendar-grid` (month grid with dots), mobile renders `mobile-calendar` (7-day rolling window starting from today; nav arrows shift ±7 days on mobile, paginate whole months on desktop) — same DOM element, JS switches the className
 - **Day-boundary separators**: each mobile day block carries a 2px ink rule above it; desktop detail panel gets the same treatment. Within a single day, `appendGamesWithDayDivider` injects a centred italic "Coming Up" / "Live & Coming Up" divider once per day when the status transitions from `post` → `live`/`pre`
@@ -70,7 +76,9 @@ Server runs on http://localhost:5000 with debug/auto-reload enabled.
 
 ## Project Layout
 - `app.py` — Flask entry point, creates and runs the app on port 5000
-- `config.py` — all user preferences: teams, work schedule, title races, storylines, league exclusions, NFL network list
+- `config.py` — all user preferences: teams, work schedule, title races, storylines, league exclusions, followed competitions (`FOLLOWED_COMPETITIONS`), NFL network list
+- `tools/validate` — uniform validation entrypoint (workspace convention, 2026-07-12): runs the pytest suite and prints `VALIDATE PASS`. Any agent or human runs `./tools/validate` with no repo-specific knowledge
+- `TODOS.md` — repo-native idea/task inbox (capture-ritual target); sessions sweep + prune it. Currently holds the World Cup / broadsheet visual-overhaul request
 - `app/espn.py` — ESPN API client with in-memory cache; `fetch_first_leg` helper for 2nd-leg UCL aggregate lookup
 - `app/importance.py` — tier classification (`must_watch` / `notable` / `major_event`)
 - `app/availability.py` — work-hours tagging (`can_watch` / `will_miss`)
@@ -84,7 +92,7 @@ Server runs on http://localhost:5000 with debug/auto-reload enabled.
 - `static/style.css` — full broadsheet style system: per-theme tokens, typography, cards, tables, responsive rules
 
 ## Testing
-Pytest suite in `tests/` covers availability, importance, userdata, playoff tagging, series context, storylines, auth, and ESPN parsing helpers (no network). Run: `python3 -m pytest tests/ -v`
+Pytest suite in `tests/` covers availability, importance, userdata, playoff tagging, series context, storylines, auth, and ESPN parsing helpers (no network). Run: `./tools/validate` (the uniform entrypoint — runs the suite, prints `VALIDATE PASS`) or `python3 -m pytest tests/ -v` directly.
 
 For anything touching the UI or live ESPN responses, still verify manually by running the app and exercising the feature in a browser.
 
