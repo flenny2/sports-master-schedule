@@ -135,3 +135,41 @@ def test_cache_roundtrip(monkeypatch):
     assert a == {"hello": "world"}
     assert a == b
     assert calls["n"] == 1  # second call served from cache
+
+
+def test_cached_get_discards_stale_entry_on_request_failure(monkeypatch):
+    """
+    Characterizes CURRENT behavior (review finding H2, 2026-07-07): when the
+    entry has aged out AND the refetch fails, _cached_get returns None even
+    though the stale data is still sitting in _cache. An upstream outage
+    therefore renders as "No games" rather than as slightly-old games.
+
+    A future stale-if-error fix would flip this test's first assertion to
+    expect the stale payload back.
+    """
+    class FakeResp:
+        def raise_for_status(self): pass
+        def json(self): return {"hello": "world"}
+
+    monkeypatch.setattr(
+        espn.requests, "get", lambda url, params=None, timeout=None: FakeResp())
+    espn.clear_cache()
+
+    # Prime the cache with a good response.
+    espn._cached_get("http://example.com/x")
+
+    # age is always >= 0, so a negative TTL makes every entry read as stale
+    # without touching the clock.
+    monkeypatch.setattr(espn.config, "CACHE_TTL_SECONDS", -1)
+
+    def failing_get(url, params=None, timeout=None):
+        raise espn.requests.RequestException("upstream down")
+
+    monkeypatch.setattr(espn.requests, "get", failing_get)
+    result = espn._cached_get("http://example.com/x")
+
+    # The stale fallback that does NOT happen today:
+    assert result is None
+    # ...even though the data was still cached and available to fall back on.
+    assert "http://example.com/x?" in espn._cache
+    assert espn._cache["http://example.com/x?"][0] == {"hello": "world"}
