@@ -120,6 +120,14 @@ not v1.
 3. **Deploy timing:** merge + push when he wants it live (WC final Sun Jul-19 is a
    natural moment for phase 1).
 
+## Amendments
+
+- **A1 (2026-07-18, Dylan's post-deploy feedback):** NBA is OFF entirely — filter chip,
+  game fetch, and standings unplugged (goes beyond D8's "NBA previews later": NBA
+  *coverage* is out; `fetch_nba_games` + its taggers are retained in code for a
+  one-line restore). Sport order app-wide is **NFL first, then Soccer** (chips, Tables,
+  Front Page minis). Sport filter chips carry glyph icons instead of color dots.
+
 ## Appendix — interview record (Jul-17, 3 rounds, answers verbatim)
 
 | # | Question | Answer |

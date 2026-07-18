@@ -560,9 +560,11 @@ def get_all_games(start_date, end_date):
     Fetch all relevant games across all sports for a date range.
     Returns a list of game dicts sorted by date.
     """
-    # Run the three sport fetchers in parallel. Each one internally runs
+    # Run the sport fetchers in parallel. Each one internally runs
     # its own per-day pool, but they don't share state so they can nest.
-    fetchers = [fetch_nfl_games, fetch_soccer_games, fetch_nba_games]
+    # NBA unplugged (Dylan, Jul-18 post-deploy feedback) — fetch_nba_games
+    # and its taggers still work; re-add it to this list to restore.
+    fetchers = [fetch_nfl_games, fetch_soccer_games]
     all_games = []
     with ThreadPoolExecutor(max_workers=len(fetchers)) as executor:
         futures = [
@@ -717,14 +719,15 @@ def fetch_standings(sport, league_slug):
 
 def get_all_standings():
     """Fetch standings for all relevant leagues."""
+    # List order = Tables-tab display order. NFL first (Dylan, Jul-18).
+    # NBA unplugged Jul-18 — re-add ("basketball", "nba") to restore.
     leagues = [
+        ("football", "nfl"),       # AFC/NFC with playoff seeding (brief D5)
         ("soccer", "eng.1"),
         ("soccer", "esp.1"),
         ("soccer", "ger.1"),
         ("soccer", "uefa.champions"),
         ("soccer", "fifa.world"),  # World Cup — 12 group tables (A–L)
-        ("basketball", "nba"),
-        ("football", "nfl"),       # AFC/NFC with playoff seeding (brief D5)
     ]
 
     results = []

@@ -699,9 +699,9 @@ function buildStorylineCard(sl, games) {
     return card;
 }
 
-// Leagues that get a compact table on the front page (NFL joins when
-// its standings ship). Order here = display order.
-var MINI_TABLE_LEAGUES = ["eng.1", "nfl"];
+// Leagues that get a compact table on the front page.
+// Order here = display order (NFL first — Dylan, Jul-18).
+var MINI_TABLE_LEAGUES = ["nfl", "eng.1"];
 
 function buildMiniTables() {
     if (!standingsLoaded || !standingsData.length) return null;

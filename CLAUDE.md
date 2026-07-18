@@ -23,7 +23,7 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 
 ## API Routes
 - `GET /api/schedule?month=YYYY-MM&refresh=true` — games for a padded calendar month (legacy `?week=` still supported)
-- `GET /api/standings?refresh=true` — standings + title races (soccer + NBA + NFL)
+- `GET /api/standings?refresh=true` — standings + title races (NFL first, then soccer; NBA unplugged per brief A1)
 - `GET /api/storylines` — active storyline chips (optional `logo_url` each)
 - `GET /api/games/<id>/facts?sport=&league=` — FREE facts panel (odds, form, H2H, lineups near kickoff; NFL injuries/leaders); public read, one cached ESPN summary call
 - `GET /api/games/<id>/preview` — tactical-read state: `none | pending | ready | error`
@@ -40,7 +40,8 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - **NFL pillar (brief D5)**: Steelers in `WATCHED_TEAMS` (id 23, must_watch) → `fetch_nfl_games` has THREE inclusion paths: watched team (slot "My Team", outranks Primetime label) / primetime / RedZone window. NFL standings = AFC/NFC conference tables with `playoffSeed` as rank (seed zones: 1 = bye, 2–7 playoff) — ESPN's v2 `level=3` division split returns empty entries, so conference view is the honest v1. `FANTASY_ROSTER` in config (name → NFL abbrev, hand-maintained post-draft) drives `app/fantasy.py` → `my_guys` on NFL games → dashed-gold "YOUR GUYS" chip
 - **Watched-row highlight is sport-scoped** in `fetch_standings` — ESPN team ids are only unique per sport (Steelers "23" ≠ NBA/soccer "23"); a flat set false-highlights other leagues
 - **Deep links**: `#front/#week/#playoffs/#tables` select a tab on load (tab clicks sync the hash); `#game-<espn id>` auto-expands that game's card — also how headless-Chrome screenshot verification reaches interactive states
-- **Importance tiers** (`app/importance.py`): must_watch / notable / major_event — all fetched NFL games are must_watch (every path implies it); soccer must-watch teams upgrade; NBA (playoffs-only coverage) = major_event
+- **Importance tiers** (`app/importance.py`): must_watch / notable / major_event — all fetched NFL games are must_watch (every path implies it); soccer must-watch teams upgrade; NBA tier logic retained but dormant
+- **NBA unplugged + NFL-first order (brief A1, Dylan post-deploy Jul-18)**: NBA is out of the fetchers list, standings list, and filter chips — `fetch_nba_games`/taggers/table builders remain for a one-line restore (comments mark the spots in `get_all_games` + `get_all_standings`). Sport order everywhere is NFL → Soccer (chips, Tables order = standings list order, `MINI_TABLE_LEAGUES`). Filter chips use recolorable CSS-mask glyph icons (`.pill-ico`), not color dots
 - **Storylines** (`config.STORYLINES`) filter the Calendar and render as Front Page story cards; **TITLE_RACES** render as the Tables widget AND as richer Front Page race cards (gap headline via `buildGapString`). Front Page dedupes: a storyline whose games live in a league already covered by a race card is skipped
 - **Soccer fetch**: pass 1 per-team schedule (past games), pass 2 one date-range scoreboard call per league, pass 3 `FOLLOWED_COMPETITIONS` full-tournament follows (fifa.world). `CALENDAR_EXCLUDED_LEAGUES` hides ger.1/esp.1 from Calendar, standings unaffected
 - **Availability**: Mon–Fri 8am–6pm PT = will_miss, else can_watch
