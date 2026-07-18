@@ -346,9 +346,10 @@ def fetch_first_leg(league_slug, home_id, away_id, round_title, second_leg_date)
 
 def fetch_nfl_games(start_date, end_date):
     """
-    Fetch NFL games across the given date range.
-    Includes past games (with final scores) + upcoming games,
-    filtered to primetime (TNF, SNF, MNF) and RedZone Sundays.
+    Fetch NFL games across the given date range. Three inclusion paths:
+      1. Watched-team games (e.g. every Steelers game — brief D5)
+      2. Primetime (TNF/SNF/MNF/Saturday night or a national network)
+      3. RedZone-window Sunday afternoon games
     """
     # Iterate day-by-day so past weeks + future dates are both covered.
     # Without a `dates=` param, ESPN only returns the current week.
@@ -358,12 +359,29 @@ def fetch_nfl_games(start_date, end_date):
     # this also handles edge cases around timezone boundaries)
     games = _filter_to_date_range(raw_games, start_date, end_date)
 
-    # Identify primetime and RedZone-relevant games
+    # Watched NFL team ids (config-driven; Steelers as of Jul-18)
+    watched_ids = {
+        t["espn_id"] for t in config.WATCHED_TEAMS
+        if t["sport"] == "football"
+    }
+
+    # Identify watched-team, primetime, and RedZone-relevant games
     tz = pytz.timezone(config.TIMEZONE)
     primetime_games = []
 
     for game in games:
         try:
+            # Tolerant lookups: a game missing team data should still
+            # fall through to the primetime checks, not be dropped.
+            home_id = (game.get("home_team") or {}).get("id")
+            away_id = (game.get("away_team") or {}).get("id")
+            if watched_ids and (home_id in watched_ids
+                                or away_id in watched_ids):
+                # "My Team" outranks the primetime label — it's the
+                # stronger personal signal on the card kicker.
+                game["nfl_slot"] = "My Team"
+                primetime_games.append(game)
+                continue
             game_dt = datetime.fromisoformat(game["date"].replace("Z", "+00:00"))
             game_local = game_dt.astimezone(tz)
             hour = game_local.hour
@@ -602,10 +620,13 @@ def fetch_standings(sport, league_slug):
 
     league_name = config.LEAGUE_NAMES.get(league_slug, data.get("name", league_slug))
 
-    # Build a set of watched team IDs for highlighting
-    watched_ids = set()
-    for t in config.WATCHED_TEAMS:
-        watched_ids.add(t["espn_id"])
+    # Watched team IDs for row highlighting — scoped to THIS sport.
+    # ESPN team ids are only unique within a sport (Steelers are "23"
+    # in the NFL; "23" is also a valid NBA/soccer id), so a flat
+    # cross-sport set would false-highlight rows in other leagues.
+    watched_ids = {
+        t["espn_id"] for t in config.WATCHED_TEAMS if t["sport"] == sport
+    }
     top_pl_ids = set(config.PL_TOP_TEAMS.keys())
 
     groups = []
@@ -631,6 +652,17 @@ def fetch_standings(sport, league_slug):
                     "gd":  _stat_val(raw_stats, "pointDifferential"),
                     "pts": _stat_val(raw_stats, "points"),
                 }
+            elif sport == "football":
+                # NFL (shape live-verified Jul-18: conference children,
+                # playoffSeed carries the seeding, no plain "rank")
+                stats = {
+                    "w":      _stat_val(raw_stats, "wins"),
+                    "l":      _stat_val(raw_stats, "losses"),
+                    "t":      _stat_val(raw_stats, "ties"),
+                    "pct":    _stat_val(raw_stats, "winPercent"),
+                    "streak": _stat_val(raw_stats, "streak"),
+                    "div":    _stat_val(raw_stats, "divisionRecord"),
+                }
             else:
                 # Basketball (NBA)
                 stats = {
@@ -643,7 +675,7 @@ def fetch_standings(sport, league_slug):
                 }
 
             rank = _stat_val(raw_stats, "rank", "0")
-            if sport == "basketball":
+            if sport in ("basketball", "football"):
                 rank = _stat_val(raw_stats, "playoffSeed", rank)
 
             # Clincher (NBA only)
@@ -692,6 +724,7 @@ def get_all_standings():
         ("soccer", "uefa.champions"),
         ("soccer", "fifa.world"),  # World Cup — 12 group tables (A–L)
         ("basketball", "nba"),
+        ("football", "nfl"),       # AFC/NFC with playoff seeding (brief D5)
     ]
 
     results = []

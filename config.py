@@ -56,7 +56,26 @@ WATCHED_TEAMS = [
         "leagues": ["ger.1", "uefa.champions"],
         "tier": "notable",
     },
+    {
+        # Dylan's NFL team (revamp interview, Jul-17). Every Steelers
+        # game surfaces — not just primetime (see fetch_nfl_games).
+        "name": "Pittsburgh Steelers",
+        "espn_id": "23",
+        "sport": "football",
+        "leagues": ["nfl"],
+        "tier": "must_watch",
+    },
 ]
+
+# ── Fantasy roster crossover (fan-level only) ─────────────────────
+# "My guys play tonight": NFL game cards get a small tag listing which
+# of your fantasy players are in that game. Hand-maintained — fill in
+# after the LPPC draft (late Aug), tweak on waivers. League STATS stay
+# in the fantasy-football app; this is watch-planning garnish only.
+#
+# Format: {"Player Name": "NFL team abbreviation"}
+#   e.g. {"Josh Jacobs": "GB", "Amon-Ra St. Brown": "DET"}
+FANTASY_ROSTER = {}
 
 # ── Title races to track ─────────────────────────────────────────
 # Teams competing for a league title. Shown as a comparison widget

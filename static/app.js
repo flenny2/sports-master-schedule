@@ -742,9 +742,14 @@ function buildMiniTable(lg) {
         row.appendChild(el("span", "mini-rank", entry.rank));
         appendIf(row, logoImg(entry.team.logo, 18));
         row.appendChild(el("span", "mini-name", entry.team.name));
-        var val = (lg.sport === "soccer")
-            ? (entry.stats.pts + " pts")
-            : (entry.stats.w + "-" + entry.stats.l);
+        var val;
+        if (lg.sport === "soccer") {
+            val = entry.stats.pts + " pts";
+        } else if (entry.stats.t && entry.stats.t !== "0") {
+            val = entry.stats.w + "-" + entry.stats.l + "-" + entry.stats.t;
+        } else {
+            val = entry.stats.w + "-" + entry.stats.l;
+        }
         row.appendChild(el("span", "mini-val", val));
         card.appendChild(row);
     });
@@ -1219,7 +1224,7 @@ function buildCard(g) {
     var kicker = el("div", "gc-kicker");
     var sportName = g.league_name || "";
     if (g.playoff_round) sportName += " \u00b7 " + g.playoff_round;
-    else if (g.nfl_slot === "Primetime") sportName += " \u00b7 Primetime";
+    else if (g.nfl_slot) sportName += " \u00b7 " + g.nfl_slot;
     kicker.appendChild(el("span", "sport-name", sportName));
     var primaryBroadcast = (g.broadcasts && g.broadcasts.length)
         ? g.broadcasts[0] : "";
@@ -1281,6 +1286,12 @@ function buildCard(g) {
 
     if (g.series_summary) {
         meta.appendChild(el("span", "gc-series", g.series_summary));
+    }
+
+    // Fantasy crossover — which of my guys play in this game (D5)
+    if (g.my_guys && g.my_guys.length) {
+        meta.appendChild(el("span", "gc-myguys",
+            "YOUR GUYS: " + g.my_guys.join(", ")));
     }
 
     // Storyline pills with competition logo in cream disc holder
@@ -2036,6 +2047,8 @@ function buildLeagueSection(league) {
         var scroll = el("div", "tbl-scroll");
         if (league.sport === "soccer") {
             scroll.appendChild(buildSoccerTable(group, league.id));
+        } else if (league.sport === "football") {
+            scroll.appendChild(buildFootballTable(group));
         } else {
             scroll.appendChild(buildNbaTable(group));
         }
@@ -2045,6 +2058,8 @@ function buildLeagueSection(league) {
     // Zone legend
     if (league.sport === "soccer") {
         body.appendChild(buildSoccerLegend(league.id));
+    } else if (league.sport === "football") {
+        body.appendChild(buildFootballLegend());
     } else {
         body.appendChild(buildNbaLegend());
     }
@@ -2126,16 +2141,16 @@ function buildSoccerLegend(leagueId) {
 
     if (leagueId === "uefa.champions") {
         addLegendItem(legend, "var(--soccer)", "Auto Round of 16");
-        addLegendItem(legend, "var(--basketball)",
+        addLegendItem(legend, "var(--gold)",
             "Knockout Playoffs (Seeded)");
-        addLegendItem(legend, "#58a6ff",
+        addLegendItem(legend, "var(--nfl)",
             "Knockout Playoffs (Unseeded)");
-        addLegendItem(legend, "var(--must-watch)", "Eliminated");
+        addLegendItem(legend, "var(--live)", "Eliminated");
     } else {
         addLegendItem(legend, "var(--soccer)", "Champions League");
-        addLegendItem(legend, "var(--basketball)", "Europa League");
-        addLegendItem(legend, "#58a6ff", "Conference League");
-        addLegendItem(legend, "var(--must-watch)", "Relegation");
+        addLegendItem(legend, "var(--gold)", "Europa League");
+        addLegendItem(legend, "var(--nfl)", "Conference League");
+        addLegendItem(legend, "var(--live)", "Relegation");
     }
 
     return legend;
@@ -2226,11 +2241,80 @@ function buildNbaTable(group) {
     return table;
 }
 
+// ── NFL standings table (conferences w/ playoff seeding) ────────
+
+function buildFootballTable(group) {
+    var table = el("table", "standings-table");
+
+    var thead = el("thead");
+    var hrow = el("tr");
+    ["#", "Team", "W", "L", "T", "Pct", "Strk", "Div"]
+        .forEach(function(col, i) {
+            var th = el("th", null, col);
+            if (i >= 6) th.classList.add("hide-mobile");
+            hrow.appendChild(th);
+        });
+    thead.appendChild(hrow);
+    table.appendChild(thead);
+
+    var tbody = el("tbody");
+    group.teams.forEach(function(entry) {
+        var tr = el("tr");
+        if (entry.is_watched) tr.classList.add("watched");
+
+        // Seed with playoff zone (7 seeds per conference; 1 = bye)
+        var rankTd = el("td", null, entry.rank);
+        var seed = parseInt(entry.rank, 10);
+        if (seed === 1) rankTd.classList.add("zone-playoff");
+        else if (seed <= 7) rankTd.classList.add("zone-playin");
+        tr.appendChild(rankTd);
+
+        var nameTd = el("td");
+        appendIf(nameTd, logoImg(entry.team.logo, 16));
+        nameTd.appendChild(
+            document.createTextNode(" " + entry.team.name));
+        tr.appendChild(nameTd);
+
+        var s = entry.stats;
+        tr.appendChild(el("td", null, s.w));
+        tr.appendChild(el("td", null, s.l));
+        tr.appendChild(el("td", null, s.t));
+        tr.appendChild(el("td", "pct-col", s.pct));
+
+        var strkTd = el("td", "hide-mobile");
+        if (s.streak) {
+            var strkSpan = el("span", null, s.streak);
+            if (s.streak.charAt(0) === "W") strkSpan.className = "streak-w";
+            if (s.streak.charAt(0) === "L") strkSpan.className = "streak-l";
+            strkTd.appendChild(strkSpan);
+        }
+        tr.appendChild(strkTd);
+        tr.appendChild(el("td", "hide-mobile", s.div));
+
+        // Playoff line: below seed 7 is out (as the season develops)
+        if (seed === 7) {
+            tr.style.borderBottom = "2px solid var(--rule-hl)";
+        }
+
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+}
+
+function buildFootballLegend() {
+    var legend = el("div", "tbl-zone-legend");
+    addLegendItem(legend, "var(--soccer)", "1 seed (bye)");
+    addLegendItem(legend, "var(--gold)", "Playoff (2-7)");
+    legend.appendChild(el("span", null, "Seeds are per conference"));
+    return legend;
+}
+
 function buildNbaLegend() {
     var legend = el("div", "tbl-zone-legend");
     addLegendItem(legend, "var(--soccer)", "Playoff (1-6)");
-    addLegendItem(legend, "var(--notable)", "Play-In (7-10)");
-    addLegendItem(legend, "var(--must-watch)", "Eliminated");
+    addLegendItem(legend, "var(--gold)", "Play-In (7-10)");
+    addLegendItem(legend, "var(--live)", "Eliminated");
 
     var sep = el("span", "lsep");
     legend.appendChild(sep);

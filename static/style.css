@@ -767,6 +767,22 @@ header {
   text-transform: uppercase;
 }
 
+/* Fantasy crossover chip — "YOUR GUYS: ..." on NFL cards */
+.gc-myguys {
+  font-family: var(--f-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+  border: 1px dashed var(--gold-text);
+  border-radius: var(--r-chip);
+  padding: 0 9px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Storyline pill — gold fill, logo in white disc */
 .sl-pill {
   background: var(--gold);

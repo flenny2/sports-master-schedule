@@ -11,6 +11,7 @@ from flask import (
 
 from app.espn import get_all_games, get_all_standings, get_title_races, clear_cache
 from app.facts import PREVIEW_SPORTS, get_game_facts
+from app.fantasy import tag_my_guys
 from app.importance import tag_importance
 from app.availability import tag_availability
 from app.playoff import tag_playoff
@@ -128,6 +129,7 @@ def api_schedule():
     games = tag_playoff(games)
     games = tag_series_context(games)
     games = tag_storylines(games)
+    games = tag_my_guys(games)
 
     # Merge in user data (watched flags, notes)
     user_data = get_all_userdata()
