@@ -916,6 +916,20 @@ function render() {
         show(tablesView);
         loadAndRenderTables();
     }
+
+    autoExpandFromHash();
+}
+
+/** Deep-link one game open: #game-<espn id> expands its card on the
+ *  current view (shareable link straight to a matchup). */
+function autoExpandFromHash() {
+    var m = (location.hash || "").match(/^#game-([\w-]+)$/);
+    if (!m) return;
+    var card = document.querySelector(
+        '.game-card[data-game-id="' + m[1] + '"]');
+    if (card && !card.classList.contains("expanded")) {
+        card.click();
+    }
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -1181,6 +1195,7 @@ function buildCard(g) {
     var isPreGame = g.status === "pre";
 
     var card = el("div", "game-card sport-" + g.sport);
+    card.dataset.gameId = g.id;
     if (isPost) card.classList.add("game-card--post");
     if (g.watched) card.classList.add("game-card--watched");
 
@@ -1413,6 +1428,19 @@ function buildCard(g) {
     notesRow.appendChild(notesArea);
     inner.appendChild(notesRow);
 
+    // Match intel — free facts panel + on-demand tactical read
+    // (soccer + NFL only, brief D3/D4). Loaded lazily on first expand
+    // so browsing the calendar never fires extra API calls.
+    if (g.sport === "soccer" || g.sport === "football") {
+        var intel = el("div", "gd-intel");
+        inner.appendChild(intel);
+        card.addEventListener("click", function onFirstExpand() {
+            if (!card.classList.contains("expanded")) return;
+            card.removeEventListener("click", onFirstExpand);
+            initGameIntel(g, intel);
+        });
+    }
+
     detail.appendChild(inner);
     card.appendChild(detail);
 
@@ -1445,6 +1473,232 @@ function buildUpTeamRow(team) {
     var name = el("span", "up-name", team.name);
     row.appendChild(name);
     return row;
+}
+
+// ═════════════════════════════════════════════════════════════════
+// MATCH INTEL — facts panel (free) + tactical read (on demand)
+// ═════════════════════════════════════════════════════════════════
+
+function initGameIntel(g, container) {
+    var factsBox = el("div", "intel-facts");
+    var readBox = el("div", "intel-read");
+    container.appendChild(factsBox);
+    container.appendChild(readBox);
+    loadFacts(g, factsBox);
+    loadReadState(g, readBox);
+}
+
+/** One label/value row inside the facts panel */
+function factRow(label, value) {
+    var row = el("div", "fact-row");
+    row.appendChild(el("span", "fact-label", label));
+    row.appendChild(el("span", "fact-val", value));
+    return row;
+}
+
+function loadFacts(g, box) {
+    box.appendChild(el("div", "intel-tag", "Match Facts"));
+    var body = el("div", "intel-body");
+    body.appendChild(el("div", "intel-hint", "Loading facts…"));
+    box.appendChild(body);
+
+    var url = "/api/games/" + g.id + "/facts?sport=" +
+        encodeURIComponent(g.sport) + "&league=" +
+        encodeURIComponent(g.league);
+    fetch(url).then(function(r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+    }).then(function(data) {
+        clear(body);
+        var f = data.facts;
+        if (!f) {
+            body.appendChild(el("div", "intel-hint",
+                "No extra facts from ESPN for this one."));
+            return;
+        }
+        if (f.odds) body.appendChild(factRow("Line", f.odds));
+        (f.form || []).forEach(function(side) {
+            body.appendChild(factRow(side.team + " form", side.results));
+        });
+        if (f.h2h && f.h2h.length) {
+            body.appendChild(factRow("Last meetings", f.h2h.join("  ·  ")));
+        }
+        (f.lineups || []).forEach(function(side) {
+            var label = side.team + " XI" +
+                (side.formation ? " (" + side.formation + ")" : "");
+            body.appendChild(factRow(label, side.starters.join(", ")));
+        });
+        (f.injuries || []).forEach(function(side) {
+            body.appendChild(factRow(side.team + " injuries",
+                side.players.join("  ·  ")));
+        });
+        (f.leaders || []).forEach(function(side) {
+            body.appendChild(factRow(side.team + " leaders",
+                side.lines.join("  ·  ")));
+        });
+        if (!body.children.length) {
+            body.appendChild(el("div", "intel-hint",
+                "No extra facts from ESPN for this one."));
+        }
+    }).catch(function() {
+        clear(body);
+        body.appendChild(el("div", "intel-hint",
+            "Facts unavailable right now."));
+    });
+}
+
+function loadReadState(g, box) {
+    fetch("/api/games/" + g.id + "/preview").then(function(r) {
+        return r.json();
+    }).then(function(rec) {
+        renderReadState(g, box, rec);
+    }).catch(function() {
+        renderReadState(g, box, { status: "none" });
+    });
+}
+
+function renderReadState(g, box, rec) {
+    clear(box);
+    box.appendChild(el("div", "intel-tag", "Tactical Read"));
+    var body = el("div", "intel-body");
+    box.appendChild(body);
+
+    if (rec.status === "ready") {
+        renderRead(g, box, body, rec);
+    } else if (rec.status === "pending") {
+        body.appendChild(el("div", "read-pending",
+            "Researching the matchup… this takes a minute or two."));
+        pollRead(g, box);
+    } else if (rec.status === "error") {
+        body.appendChild(el("div", "intel-hint",
+            "Generation failed: " + (rec.error || "unknown error")));
+        body.appendChild(buildReadButton(g, box, "Try again"));
+    } else {
+        // No preview yet
+        if (g.status === "pre") {
+            body.appendChild(el("div", "intel-hint",
+                "Coach philosophies, expected shape, key duels — " +
+                "researched and written when you ask for it."));
+            body.appendChild(buildReadButton(g, box, "Generate tactical read"));
+        } else {
+            body.appendChild(el("div", "intel-hint",
+                "No tactical read was generated for this game."));
+        }
+    }
+}
+
+function buildReadButton(g, box, label) {
+    var btn = el("button", "read-btn", label);
+    btn.type = "button";
+    btn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        btn.disabled = true;
+        btn.textContent = "Starting…";
+        fetch("/api/games/" + g.id + "/preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                sport: g.sport,
+                league: g.league,
+                league_name: g.league_name || "",
+                home: g.home_team.name,
+                away: g.away_team.name,
+                date: g.date,
+                venue: g.venue || ""
+            })
+        }).then(function(r) {
+            if (r.status === 401) {
+                throw new Error("Unauthorized — open the app once " +
+                    "via your ?token= link to enable generation.");
+            }
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            renderReadState(g, box, { status: "pending" });
+        }).catch(function(err) {
+            renderReadState(g, box, { status: "error", error: err.message });
+        });
+    });
+    return btn;
+}
+
+function pollRead(g, box) {
+    var tries = 0;
+    var timer = setInterval(function() {
+        tries++;
+        if (tries > 100) {  // ~5 minutes — give up politely
+            clearInterval(timer);
+            renderReadState(g, box, {
+                status: "error",
+                error: "timed out waiting — try refreshing"
+            });
+            return;
+        }
+        fetch("/api/games/" + g.id + "/preview").then(function(r) {
+            return r.json();
+        }).then(function(rec) {
+            if (rec.status === "ready" || rec.status === "error") {
+                clearInterval(timer);
+                renderReadState(g, box, rec);
+            }
+        }).catch(function() { /* keep polling */ });
+    }, 3000);
+}
+
+/** Render a ready tactical read: banner (dry-run), sections, meta row */
+function renderRead(g, box, body, rec) {
+    if (rec.model === "dry-run") {
+        body.appendChild(el("div", "read-banner",
+            "DRY RUN — set ANTHROPIC_API_KEY to generate real reads"));
+    }
+    (rec.sections || []).forEach(function(sec) {
+        body.appendChild(el("h4", "read-h", sec.heading));
+        appendReadBody(body, sec.body || "");
+    });
+
+    var meta = el("div", "read-meta");
+    var when = rec.generated_at
+        ? new Date(rec.generated_at).toLocaleString("en-US",
+            { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+        : "";
+    meta.appendChild(el("span", null,
+        (rec.model || "") + (when ? " · " + when : "")));
+    var refresh = el("button", "read-refresh", "Refresh read");
+    refresh.type = "button";
+    refresh.title = "Regenerates from scratch (costs a fresh press)";
+    refresh.addEventListener("click", function(e) {
+        e.stopPropagation();
+        var b = buildReadButton(g, box, "x");
+        b.click();  // reuse the POST + state flow
+    });
+    meta.appendChild(refresh);
+    body.appendChild(meta);
+}
+
+/** Plain-text section body -> paragraphs + "- " bullet lists (safe DOM) */
+function appendReadBody(parent, bodyText) {
+    var lines = bodyText.split("\n");
+    var ul = null;
+    var para = [];
+    function flushPara() {
+        if (para.length) {
+            parent.appendChild(el("p", "read-p", para.join(" ")));
+            para = [];
+        }
+    }
+    lines.forEach(function(ln) {
+        var t = ln.trim();
+        if (t.indexOf("- ") === 0) {
+            flushPara();
+            if (!ul) { ul = el("ul", "read-ul"); parent.appendChild(ul); }
+            ul.appendChild(el("li", null, t.slice(2)));
+        } else if (t === "") {
+            flushPara();
+            ul = null;
+        } else {
+            ul = null;
+            para.push(t);
+        }
+    });
+    flushPara();
 }
 
 // ═════════════════════════════════════════════════════════════════

@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 data/*.db
 data/userdata.json
+data/previews.json
 .env
 venv/
 .venv/

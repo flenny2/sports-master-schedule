@@ -97,6 +97,60 @@ def test_empty_body_on_watched_defaults_to_false(tmp_path, monkeypatch):
     assert data["123"]["watched"] is False
 
 
+def test_preview_post_rejected_without_cookie(tmp_path, monkeypatch):
+    # The generate endpoint spends money once a key is set — it must sit
+    # behind the same write gate as watched/notes (brief D3).
+    client = _client_with_token("hunter2", tmp_path, monkeypatch)
+    r = client.post("/api/games/123/preview", json={
+        "sport": "soccer", "league": "eng.1",
+        "home": "Arsenal", "away": "Manchester City",
+    })
+    assert r.status_code == 401
+
+
+def test_preview_post_validates_sport(tmp_path, monkeypatch):
+    client = _client_with_token("", tmp_path, monkeypatch)
+    r = client.post("/api/games/123/preview", json={
+        "sport": "basketball", "home": "LAL", "away": "BOS",
+    })
+    assert r.status_code == 400
+
+
+def test_preview_post_accepts_and_marks_pending(tmp_path, monkeypatch):
+    client = _client_with_token("", tmp_path, monkeypatch)
+    # Keep it offline: stub the generation thread + point the store at tmp
+    import app.routes
+    import app.previews
+    monkeypatch.setattr(app.previews, "PREVIEWS_FILE",
+                        str(tmp_path / "p.json"))
+    monkeypatch.setattr(app.routes, "start_generation",
+                        lambda gid, ctx: None)
+    r = client.post("/api/games/123/preview", json={
+        "sport": "soccer", "league": "eng.1", "league_name": "Premier League",
+        "home": "Arsenal", "away": "Manchester City",
+        "date": "2026-08-22T16:30Z", "venue": "Emirates Stadium",
+    })
+    assert r.status_code == 202
+    rec = app.previews.get_preview("123")
+    assert rec["status"] == "pending"
+    # Second press while pending doesn't restart (no double spend)
+    r2 = client.post("/api/games/123/preview", json={
+        "sport": "soccer", "league": "eng.1",
+        "home": "Arsenal", "away": "Manchester City",
+    })
+    assert r2.status_code == 202
+
+
+def test_preview_get_is_public_and_none_by_default(tmp_path, monkeypatch):
+    client = _client_with_token("hunter2", tmp_path, monkeypatch)
+    import app.previews
+    monkeypatch.setattr(app.previews, "PREVIEWS_FILE",
+                        str(tmp_path / "p.json"))
+    r = client.get("/api/games/999/preview")
+    assert r.status_code == 200
+    assert r.get_json()["status"] == "none"
+
+
 @pytest.fixture(autouse=True)
 def _reset_env(monkeypatch):
     # Ensure no stale SCHEDULE_TOKEN / DATA_DIR leaks from one test

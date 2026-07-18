@@ -3,3 +3,4 @@ requests==2.32.3
 pytz==2025.2
 pytest==8.3.3
 gunicorn==23.0.0
+anthropic==0.117.0

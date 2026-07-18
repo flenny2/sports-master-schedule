@@ -10,12 +10,15 @@ from flask import (
 )
 
 from app.espn import get_all_games, get_all_standings, get_title_races, clear_cache
+from app.facts import PREVIEW_SPORTS, get_game_facts
 from app.importance import tag_importance
 from app.availability import tag_availability
 from app.playoff import tag_playoff
 from app.series_context import tag_series_context
 from app.storylines import tag_storylines, get_active_storylines
 from app.userdata import get_all_userdata, set_watched, set_notes
+from app import previews as preview_store
+from app.tactical import start_generation
 
 main = Blueprint("main", __name__)
 
@@ -165,6 +168,67 @@ def api_save_notes(game_id):
     # Keep notes bounded so a misbehaving client can't balloon the JSON file
     set_notes(game_id, notes[:2000])
     return jsonify({"ok": True})
+
+
+@main.route("/api/games/<game_id>/facts")
+def api_game_facts(game_id):
+    """
+    Free pre-match facts panel (injuries / form / H2H / lineups / odds).
+    Public read like the other GETs; one cached ESPN summary call.
+    """
+    sport = request.args.get("sport", "").strip()
+    league = request.args.get("league", "").strip()
+    if sport not in PREVIEW_SPORTS or not league:
+        return jsonify({"facts": None})
+    return jsonify({"facts": get_game_facts(sport, league, game_id)})
+
+
+@main.route("/api/games/<game_id>/preview")
+def api_get_preview(game_id):
+    """Poll endpoint for the tactical read: none | pending | ready | error."""
+    record = preview_store.get_preview(game_id)
+    return jsonify(record or {"status": "none"})
+
+
+@main.route("/api/games/<game_id>/preview", methods=["POST"])
+def api_generate_preview(game_id):
+    """
+    Kick off a tactical-read generation for one game.
+
+    Auth-gated like all writes (spend protection — this is the endpoint
+    that costs money once ANTHROPIC_API_KEY is set). Returns 202
+    immediately; the work happens in a background thread so gunicorn's
+    60s timeout never bites. The client polls the GET endpoint.
+    """
+    if not _write_allowed():
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+
+    def _s(key, cap=120):
+        val = data.get(key, "")
+        return val[:cap] if isinstance(val, str) else ""
+
+    ctx = {
+        "sport": _s("sport", 20),
+        "league": _s("league", 40),
+        "league_name": _s("league_name"),
+        "home": _s("home"),
+        "away": _s("away"),
+        "date": _s("date", 40),
+        "venue": _s("venue"),
+    }
+    if ctx["sport"] not in PREVIEW_SPORTS or not ctx["home"] or not ctx["away"]:
+        return jsonify({"error": "sport must be soccer/football with teams"}), 400
+
+    existing = preview_store.get_preview(game_id)
+    if existing and existing.get("status") == "pending":
+        # A generation is already running — don't double-spend
+        return jsonify({"status": "pending"}), 202
+
+    preview_store.mark_pending(game_id, ctx)
+    start_generation(game_id, ctx)
+    return jsonify({"status": "pending"}), 202
 
 
 @main.route("/api/storylines")
