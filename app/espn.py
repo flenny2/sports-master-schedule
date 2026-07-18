@@ -122,6 +122,11 @@ def _parse_game(event, sport, league_slug):
                 "abbreviation": team.get("abbreviation", "???"),
                 "id": str(team.get("id", "")),
                 "logo": team.get("logo", ""),
+                # Kit colors (hex WITHOUT '#', e.g. "6CABDD") — drive the
+                # frontend's team-color "duel seam" on game cards. Missing
+                # on some events; frontend falls back to the sport color.
+                "color": team.get("color", ""),
+                "alt_color": team.get("alternateColor", ""),
             }
             # Extract team record if available (e.g. "25-10-3")
             for rec in team_info.get("records", []):

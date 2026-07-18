@@ -3,19 +3,20 @@
  *
  * Architecture:
  *   - Fetch games from /api/schedule (month-based)
- *   - Desktop: month grid overview + detail panel for selected day
- *   - Mobile: 2-week vertical list with inline game cards
- *   - Today view: command center with live/upcoming/completed sections
+ *   - Home (front page): marquee game, today's slate, storyline cards,
+ *     mini standings — the fan-hub landing view
+ *   - Calendar: desktop month grid + detail panel; mobile rolling 7-day list
  *   - Tables view: standings + title race widgets
  *   - Game cards: "upcoming" layout (pre-game) vs "scoreboard" layout (live/final)
  *   - Click any card to expand for venue, broadcast, standings context
+ *   - Single LIGHT theme — no toggle (Dylan, Jul-15 ruling)
  */
 
 // ── State ────────────────────────────────────────────────────────
 var now          = new Date();
 var currentYear  = now.getFullYear();
 var currentMonth = now.getMonth() + 1;  // 1-indexed (1=Jan, 12=Dec)
-var currentView  = "week";   // "week" = calendar tab, "playoffs", "tables"
+var currentView  = "front";  // "front" = Home tab, "week" = calendar, "playoffs", "tables"
 var currentSport = "all";
 var selectedDate = null;
 var allGames     = [];
@@ -36,9 +37,7 @@ var monthLabel   = document.getElementById("week-label");
 var btnPrev      = document.getElementById("btn-prev");
 var btnNext      = document.getElementById("btn-next");
 var btnRefresh   = document.getElementById("btn-refresh");
-var btnTheme     = document.getElementById("btn-theme");
-var todayStrip   = document.getElementById("today-strip");
-var tsContent    = document.getElementById("ts-content");
+var frontView    = document.getElementById("front-view");
 var calGrid      = document.getElementById("calendar-grid");
 var detPanel     = document.getElementById("detail-panel");
 var weekView     = document.getElementById("week-view");
@@ -101,6 +100,37 @@ function logoImg(url, size) {
 /** Append a child node only if it's not null */
 function appendIf(parent, child) {
     if (child) parent.appendChild(child);
+}
+
+// ── Duel seam — team kit colors on the card's top strip ─────────
+// Fallback pairs per sport when ESPN doesn't provide usable colors.
+var SPORT_SEAM = {
+    soccer:     ["#0E7C3A", "#075E2C"],
+    basketball: ["#E25A00", "#A84300"],
+    football:   ["#2352E0", "#16359C"]
+};
+
+/** Quick perceptual lightness 0..1 for a bare "RRGGBB" hex */
+function hexLuma(hex) {
+    var r = parseInt(hex.slice(0, 2), 16) / 255;
+    var g = parseInt(hex.slice(2, 4), 16) / 255;
+    var b = parseInt(hex.slice(4, 6), 16) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Pick a usable seam color for a team: primary kit color unless it's
+ *  too light to read on the white card, then the alternate, then the
+ *  sport fallback. ESPN sends bare hex without "#". */
+function seamColor(team, fallback) {
+    var hex = (team.color || "").trim();
+    if (/^[0-9a-fA-F]{6}$/.test(hex) && hexLuma(hex) <= 0.82) {
+        return "#" + hex;
+    }
+    var alt = (team.alt_color || "").trim();
+    if (/^[0-9a-fA-F]{6}$/.test(alt) && hexLuma(alt) <= 0.82) {
+        return "#" + alt;
+    }
+    return fallback;
 }
 
 function groupByDay(games) {
@@ -294,17 +324,6 @@ btnNext.addEventListener("click", function() {
 
 btnRefresh.addEventListener("click", function() { loadSchedule(true); });
 
-// Theme toggle — persist to localStorage so reloads remember the choice.
-// Initial theme was resolved in the <head> inline script (FOUC-safe).
-btnTheme.addEventListener("click", function() {
-    var el = document.documentElement;
-    var next = el.getAttribute("data-theme") === "dark" ? "light" : "dark";
-    el.setAttribute("data-theme", next);
-    try { localStorage.setItem("theme", next); } catch (e) {}
-});
-
-// Today strip is PASSIVE — information only. No click handlers.
-
 document.querySelectorAll(".tab").forEach(function(t) {
     t.addEventListener("click", function() {
         document.querySelectorAll(".tab").forEach(function(x) {
@@ -314,9 +333,25 @@ document.querySelectorAll(".tab").forEach(function(t) {
         t.classList.add("active");
         t.setAttribute("aria-current", "page");
         currentView = t.dataset.view;
+        // Keep the URL hash in sync so tabs are deep-linkable
+        try { history.replaceState(null, "", "#" + currentView); } catch (e) {}
         render();
     });
 });
+
+// Deep links: #front / #week / #playoffs / #tables select a tab on load
+(function initViewFromHash() {
+    var hash = (location.hash || "").replace("#", "");
+    var valid = { front: 1, week: 1, playoffs: 1, tables: 1 };
+    if (!valid[hash] || hash === currentView) return;
+    currentView = hash;
+    document.querySelectorAll(".tab").forEach(function(x) {
+        var on = x.dataset.view === hash;
+        x.classList.toggle("active", on);
+        if (on) x.setAttribute("aria-current", "page");
+        else x.removeAttribute("aria-current");
+    });
+})();
 
 document.querySelectorAll(".pill").forEach(function(b) {
     b.addEventListener("click", function() {
@@ -382,6 +417,7 @@ window.addEventListener("resize", function() {
 // ── Data ─────────────────────────────────────────────────────────
 
 function loadSchedule(refresh) {
+    clear(frontView);
     clear(calGrid);
     clear(detPanel);
     clear(playoffsView);
@@ -416,9 +452,9 @@ function loadSchedule(refresh) {
         }
 
         render();
-        renderTodayStrip();
         updatePlayoffsTabBadge();
     }).catch(function(err) {
+        hide(frontView);
         hide(weekView);
         clear(statusMsg);
         statusMsg.appendChild(el("div", null, "Failed to load schedule"));
@@ -427,80 +463,297 @@ function loadSchedule(refresh) {
     });
 }
 
-/** Persistent banner summarising today across all views */
-function renderTodayStrip() {
-    if (!todayStrip || !tsContent) return;
-    clear(tsContent);
+// ═════════════════════════════════════════════════════════════════
+// FRONT PAGE (Home) — marquee, slate, storylines, mini standings
+// ═════════════════════════════════════════════════════════════════
+
+/** Rank today's games for the marquee slot: live beats upcoming beats
+ *  final; within a status, must-watch > major-event, playoffs boosted. */
+function scoreMarquee(g) {
+    var s = 0;
+    if (g.status === "in") s += 100;
+    else if (g.status === "pre") s += 50;
+    if (g.tier === "must_watch") s += 30;
+    else if (g.tier === "major_event") s += 20;
+    if (g.is_playoff) s += 15;
+    return s;
+}
+
+function pickMarqueeGame(todayGames) {
+    if (!todayGames.length) return null;
+    var pool = todayGames.slice();
+    pool.sort(function(a, b) {
+        var d = scoreMarquee(b) - scoreMarquee(a);
+        return d !== 0 ? d : a.date.localeCompare(b.date);
+    });
+    return pool[0];
+}
+
+/** Programmatic tab switch (used by "Full tables" links) */
+function switchView(view) {
+    var btn = document.querySelector('.tab[data-view="' + view + '"]');
+    if (btn) btn.click();
+}
+
+function renderFrontPage(games) {
+    clear(frontView);
 
     var today = todayStr();
-    var gbd = groupByDay(allGames);
-    var todayGames = gbd[today] || [];
-
-    // Nothing today — still show the strip so the next-up game stays visible
-    if (todayGames.length === 0) {
-        var nextUp = findNextGame(allGames);
-        if (!nextUp) {
-            hide(todayStrip);
-            return;
-        }
-        tsContent.appendChild(el("span", "ts-empty", "No games today"));
-        tsContent.appendChild(el("span", "ts-sep", "\u00b7"));
-        var nextLabel = el("span", "ts-next");
-        nextLabel.appendChild(document.createTextNode("Next: "));
-        var nb = el("b", null,
-            nextUp.away_team.abbreviation + " @ " + nextUp.home_team.abbreviation);
-        nextLabel.appendChild(nb);
-        var nextDateStr = new Date(nextUp.date).toLocaleDateString("en-CA");
-        nextLabel.appendChild(document.createTextNode(
-            " \u00b7 " + fmtDateShort(nextDateStr) + " " + fmtTime(nextUp.date)));
-        tsContent.appendChild(nextLabel);
-        show(todayStrip);
-        return;
-    }
-
-    var live = todayGames.filter(function(g) { return g.status === "in"; });
-    var upcoming = todayGames.filter(function(g) { return g.status === "pre"; });
-    upcoming.sort(function(a, b) { return a.date.localeCompare(b.date); });
-
-    // Count + sport dots
-    var count = el("span", "ts-count",
-        todayGames.length + (todayGames.length === 1 ? " game today" : " games today"));
-    tsContent.appendChild(count);
-
-    var sportsSet = {};
-    todayGames.forEach(function(g) { sportsSet[g.sport] = true; });
-    var dots = el("span", "ts-dots");
-    ["soccer", "basketball", "football"].forEach(function(sp) {
-        if (sportsSet[sp]) dots.appendChild(el("span", "ts-dot " + sp));
+    var gbd = groupByDay(games);
+    var todayGames = (gbd[today] || []).slice();
+    // Slate order: live first, then upcoming by kickoff, finals last
+    var statusRank = { "in": 0, "pre": 1, "post": 2 };
+    todayGames.sort(function(a, b) {
+        var d = statusRank[a.status] - statusRank[b.status];
+        return d !== 0 ? d : a.date.localeCompare(b.date);
     });
-    tsContent.appendChild(dots);
 
-    // Live indicator takes priority
-    if (live.length > 0) {
-        var liveEl = el("span", "ts-live",
-            live.length + (live.length === 1 ? " live" : " live"));
-        tsContent.appendChild(liveEl);
-        var g = live[0];
-        var liveInfo = el("span", "ts-next");
-        liveInfo.appendChild(el("b", null,
-            g.away_team.abbreviation + " " +
-            (g.score ? g.score.away : "0") + "\u2013" +
-            (g.score ? g.score.home : "0") + " " + g.home_team.abbreviation));
-        tsContent.appendChild(liveInfo);
-    } else if (upcoming.length > 0) {
-        var next = upcoming[0];
-        var upEl = el("span", "ts-next");
-        upEl.appendChild(document.createTextNode("Next: "));
-        upEl.appendChild(el("b", null,
-            next.away_team.abbreviation + " @ " + next.home_team.abbreviation));
-        upEl.appendChild(document.createTextNode(" at " + fmtTime(next.date)));
-        tsContent.appendChild(upEl);
-    } else {
-        // All of today's games are completed
-        tsContent.appendChild(el("span", "ts-next", "All games finished"));
+    var dateline = new Date().toLocaleDateString("en-US", {
+        weekday: "long", month: "long", day: "numeric"
+    });
+    frontView.appendChild(el("div", "fp-dateline",
+        dateline.toUpperCase() + " · THE SLATE"));
+
+    var grid = el("div", "fp-grid");
+    var colMain = el("div", "fp-col-main");
+    var colRail = el("div", "fp-col-rail");
+    grid.appendChild(colMain);
+    grid.appendChild(colRail);
+    frontView.appendChild(grid);
+
+    // ── Marquee — the one game that headlines today ──────────────
+    var marquee = pickMarqueeGame(todayGames);
+    if (marquee) {
+        var hero = el("div", "fp-block fp-hero");
+        hero.appendChild(el("span",
+            "sec-tag" + (marquee.status === "in" ? " is-live" : ""),
+            marquee.status === "in" ? "Live Now" : "Main Event"));
+        var mc = buildCard(marquee);
+        mc.classList.add("game-card--marquee");
+        hero.appendChild(mc);
+        if (marquee.status === "pre") {
+            hero.appendChild(el("div", "fp-hero-note",
+                "Kicks off in " + countdownText(marquee.date)));
+        }
+        colMain.appendChild(hero);
     }
 
-    show(todayStrip);
+    // ── Today's slate (everything else today) ────────────────────
+    var slate = el("div", "fp-block fp-slate");
+    slate.appendChild(el("span", "sec-tag", "Today's Slate"));
+    var list = el("div", "fp-slate-list");
+
+    if (todayGames.length === 0) {
+        var nxt = findNextGame(games);
+        if (nxt) {
+            list.appendChild(buildNextUpCard(nxt));
+        } else {
+            list.appendChild(el("div", "dp-empty",
+                "No games in this window — browse the calendar."));
+        }
+    } else {
+        var rest = todayGames.filter(function(g) {
+            return !marquee || g.id !== marquee.id;
+        });
+        if (rest.length === 0) {
+            list.appendChild(el("div", "dp-empty",
+                "That's the only game today."));
+        } else {
+            rest.forEach(function(g) { list.appendChild(buildCard(g)); });
+        }
+    }
+    slate.appendChild(list);
+    colMain.appendChild(slate);
+
+    // ── Rail: storyline cards + mini standings ───────────────────
+    var stories = buildStoryBlock(games);
+    if (stories) colRail.appendChild(stories);
+    var minis = buildMiniTables();
+    if (minis) colRail.appendChild(minis);
+}
+
+/** "No games today" — surface the next fixture as a compact card */
+function buildNextUpCard(g) {
+    var card = el("div", "fp-next");
+    card.appendChild(el("div", "fp-next-label",
+        "No games today · next up"));
+    var matchup = el("div", "fp-next-matchup");
+    appendIf(matchup, logoImg(g.away_team.logo, 30));
+    matchup.appendChild(document.createTextNode(g.away_team.abbreviation));
+    matchup.appendChild(el("span", "up-vs", "at"));
+    appendIf(matchup, logoImg(g.home_team.logo, 30));
+    matchup.appendChild(document.createTextNode(g.home_team.abbreviation));
+    card.appendChild(matchup);
+    var nextDateStr = new Date(g.date).toLocaleDateString("en-CA");
+    card.appendChild(el("div", "fp-next-when",
+        fmtDateShort(nextDateStr) + " · " + fmtTime(g.date) +
+        " · in " + countdownText(g.date)));
+    return card;
+}
+
+/** Storyline cards: title races (rich standings data) first, then
+ *  config storylines that aren't already covered by a race card. */
+function buildStoryBlock(games) {
+    if (!titleRacesData.length && !storylinesData.length) return null;
+
+    var block = el("div", "fp-block fp-stories");
+    block.appendChild(el("span", "sec-tag", "Storylines"));
+    var list = el("div", "fp-stories-list");
+
+    var raceLeagues = {};
+    titleRacesData.forEach(function(race) {
+        raceLeagues[race.league] = true;
+        list.appendChild(buildRaceStoryCard(race));
+    });
+
+    storylinesData.forEach(function(sl) {
+        // Skip a storyline whose games live in a league already covered
+        // by a title-race card (avoids near-duplicate cards).
+        var slLeague = findStorylineLeague(sl.id, games);
+        if (slLeague && raceLeagues[slLeague]) return;
+        list.appendChild(buildStorylineCard(sl, games));
+    });
+
+    if (!list.children.length) return null;
+    block.appendChild(list);
+    return block;
+}
+
+/** League slug of the first game tagged with this storyline, or null */
+function findStorylineLeague(storylineId, games) {
+    for (var i = 0; i < games.length; i++) {
+        var sls = games[i].storylines || [];
+        for (var j = 0; j < sls.length; j++) {
+            if (sls[j].id === storylineId) return games[i].league;
+        }
+    }
+    return null;
+}
+
+/** Title race as an editorial story card: gap headline + next fixtures */
+function buildRaceStoryCard(race) {
+    var card = el("div", "story-card");
+    var head = el("div", "story-card-head");
+    var leaderLogo = race.contenders[0] && race.contenders[0].team.logo;
+    var logo = logoImg(leaderLogo, 30);
+    if (logo) { logo.className = "story-logo"; head.appendChild(logo); }
+    head.appendChild(el("span", "story-label", race.label));
+    card.appendChild(head);
+
+    card.appendChild(el("div", "story-state", buildGapString(race)));
+
+    var next = el("div", "story-next");
+    next.appendChild(el("span", "story-next-label", "Next"));
+    race.contenders.forEach(function(c) {
+        if (c.upcoming && c.upcoming.length) {
+            var f = c.upcoming[0];
+            next.appendChild(el("span", "story-next-fix",
+                c.team.abbr + " " + (f.home ? "vs " : "@ ") + f.opponent));
+        }
+    });
+    if (next.children.length > 1) card.appendChild(next);
+    return card;
+}
+
+/** Config storyline as a story card: description + next tagged fixture */
+function buildStorylineCard(sl, games) {
+    var card = el("div", "story-card");
+    var head = el("div", "story-card-head");
+    if (sl.logo_url) {
+        var img = document.createElement("img");
+        img.src = sl.logo_url;
+        img.alt = "";
+        img.className = "story-logo";
+        img.loading = "lazy";
+        img.onerror = function() { this.style.display = "none"; };
+        head.appendChild(img);
+    }
+    head.appendChild(el("span", "story-label", sl.label));
+    card.appendChild(head);
+
+    if (sl.description) {
+        card.appendChild(el("div", "story-desc", sl.description));
+    }
+
+    // Next upcoming game carrying this storyline tag
+    var next = null;
+    for (var i = 0; i < games.length; i++) {
+        var g = games[i];
+        if (g.status !== "pre") continue;
+        var sls = g.storylines || [];
+        for (var j = 0; j < sls.length; j++) {
+            if (sls[j].id === sl.id) { next = g; break; }
+        }
+        if (next) break;
+    }
+    if (next) {
+        var row = el("div", "story-next");
+        row.appendChild(el("span", "story-next-label", "Next"));
+        var nextDateStr = new Date(next.date).toLocaleDateString("en-CA");
+        row.appendChild(el("span", "story-next-fix",
+            next.away_team.abbreviation + " @ " +
+            next.home_team.abbreviation + " · " +
+            fmtDateShort(nextDateStr)));
+        card.appendChild(row);
+    }
+    return card;
+}
+
+// Leagues that get a compact table on the front page (NFL joins when
+// its standings ship). Order here = display order.
+var MINI_TABLE_LEAGUES = ["eng.1", "nfl"];
+
+function buildMiniTables() {
+    if (!standingsLoaded || !standingsData.length) return null;
+
+    var block = el("div", "fp-block fp-tables");
+    block.appendChild(el("span", "sec-tag", "Tables"));
+    var list = el("div", "fp-tables-list");
+
+    MINI_TABLE_LEAGUES.forEach(function(slug) {
+        for (var i = 0; i < standingsData.length; i++) {
+            if (standingsData[i].id === slug) {
+                list.appendChild(buildMiniTable(standingsData[i]));
+                break;
+            }
+        }
+    });
+
+    if (!list.children.length) return null;
+    block.appendChild(list);
+    return block;
+}
+
+/** Compact standings card: top 5 + watched teams outside the top 5 */
+function buildMiniTable(lg) {
+    var card = el("div", "mini-table");
+    var head = el("div", "mini-table-head");
+    head.appendChild(el("span", "mini-table-name", lg.name));
+    card.appendChild(head);
+
+    var group = lg.groups[0] || { teams: [] };
+    var top = group.teams.slice(0, 5);
+    var extras = group.teams.slice(5).filter(function(t) {
+        return t.is_watched;
+    });
+
+    top.concat(extras).forEach(function(entry) {
+        var row = el("div", "mini-row" + (entry.is_watched ? " watched" : ""));
+        row.appendChild(el("span", "mini-rank", entry.rank));
+        appendIf(row, logoImg(entry.team.logo, 18));
+        row.appendChild(el("span", "mini-name", entry.team.name));
+        var val = (lg.sport === "soccer")
+            ? (entry.stats.pts + " pts")
+            : (entry.stats.w + "-" + entry.stats.l);
+        row.appendChild(el("span", "mini-val", val));
+        card.appendChild(row);
+    });
+
+    var more = el("button", "mini-more", "Full tables →");
+    more.type = "button";
+    more.addEventListener("click", function() { switchView("tables"); });
+    card.appendChild(more);
+    return card;
 }
 
 /** Pulse red dot on the Playoffs tab when a playoff game is live */
@@ -521,6 +774,8 @@ function loadStorylines() {
     }).then(function(data) {
         storylinesData = data.storylines || [];
         renderStorylineFilters();
+        // Front page shows storyline cards — refresh it if it's on screen
+        if (currentView === "front") render();
     }).catch(function() {
         // Non-critical — chip bar just won't appear
     });
@@ -601,6 +856,8 @@ function loadStandings() {
         standingsData = data.leagues || [];
         titleRacesData = data.title_races || [];
         standingsLoaded = true;
+        // Front page shows race cards + mini tables — refresh if on screen
+        if (currentView === "front") render();
     }).catch(function() {
         // Non-critical — standings just won't appear in card detail
     });
@@ -634,17 +891,26 @@ function render() {
         ? allGames
         : allGames.filter(function(g) { return g.sport === currentSport; });
 
-    if (currentView === "week") {
+    if (currentView === "front") {
+        show(frontView);
+        hide(weekView);
+        hide(playoffsView);
+        hide(tablesView);
+        renderFrontPage(games);
+    } else if (currentView === "week") {
+        hide(frontView);
         show(weekView);
         hide(playoffsView);
         hide(tablesView);
         renderCalendar(games);
     } else if (currentView === "playoffs") {
+        hide(frontView);
         hide(weekView);
         show(playoffsView);
         hide(tablesView);
         renderPlayoffs(games);
     } else if (currentView === "tables") {
+        hide(frontView);
         hide(weekView);
         hide(playoffsView);
         show(tablesView);
@@ -924,7 +1190,11 @@ function buildCard(g) {
         card.classList.toggle("expanded");
     });
 
-    // Sport-color rail — the singular bold color signal
+    // Duel seam — away team color meets home team color at an angled
+    // cut across the card's top edge (the design's signature element).
+    var seamFallback = SPORT_SEAM[g.sport] || ["#4A5568", "#0C1522"];
+    card.style.setProperty("--seam-a", seamColor(g.away_team, seamFallback[0]));
+    card.style.setProperty("--seam-b", seamColor(g.home_team, seamFallback[1]));
     card.appendChild(el("div", "rail"));
 
     // ── Kicker line: competition · round · broadcast ─────────
@@ -971,7 +1241,7 @@ function buildCard(g) {
         var time = el("div", "up-time");
         var t = new Date(g.date);
         var hh = t.toLocaleTimeString("en-US",
-            { hour: "2-digit", minute: "2-digit", hour12: true });
+            { hour: "numeric", minute: "2-digit", hour12: true });
         // "07:30 AM" → number on top line, " AM PT" in small
         var parts = hh.split(" ");
         time.appendChild(document.createTextNode(parts[0]));
