@@ -1,104 +1,99 @@
 # Sports Master Schedule
 
-what: personal sports schedule tracker — upcoming games filtered by interest + work availability; Flask + vanilla HTML/CSS/JS, ESPN public API, in-memory cache, no DB and no build step
-rules: docs describe `master` only; NEVER `git push` (push = Render auto-deploy — the queue runner branches, shipping is Dylan's call); run `./tools/validate` before shipping; add every themed CSS token in BOTH light + dark blocks
-links: deploy config `render.yaml` (Render free tier); repo idea/task inbox `TODOS.md`; UI/style reference `personal-style-tracker/`
-updated: 2026-07-13
+what: Dylan's meta sports tracker / fan-experience hub — Front Page (marquee + slate + storylines + tables), calendar, playoffs, standings, and ON-DEMAND Claude tactical previews; Flask + vanilla HTML/CSS/JS, ESPN public API, in-memory cache, no DB and no build step
+rules: docs describe `master` only; NEVER `git push` (push = Render auto-deploy — shipping is Dylan's call); run `./tools/validate` before shipping; SINGLE LIGHT THEME — one `:root` token block, no dark mode, no toggle (Dylan Jul-15 ruling); preview generation is on-demand ONLY (spend = button press, never automatic)
+links: product truth `PRODUCT_BRIEF.md` (D1–D8, interview-converged Jul-17) · deploy config `render.yaml` (Render free tier) · idea/task inbox `TODOS.md` · cross-project style rulings `personal-style-tracker/`
+updated: 2026-07-18
 
-Personal sports schedule tracker — shows upcoming games filtered by interest level and availability. Visual direction is editorial/broadsheet: cream newsprint in light mode, warm coffee-black in dark mode, bold sport-colour accents.
+Dylan's fan hub — phone-first (deployed Render URL). Visual identity: **"broadcast graphics, in daylight"** — bright cool-white surfaces, near-monochrome ink chrome, ALL vivid color from teams/sports, ink "lower-third" section tags with a gold lead, and the signature **team-color duel seam** across each game card's top edge.
 
 ## Tech Stack
-- Python 3 / Flask backend
-- In-memory cache with TTL (no database)
+- Python 3 / Flask backend; in-memory cache with TTL (no database)
 - Vanilla HTML/CSS/JS frontend (no build step, no bundler, no framework)
-- ESPN public API (no auth required)
-- Google Fonts via CDN: **Archivo Black** (display), **Archivo** (body/UI), **Fraunces** opsz 900 (scores + kickoff times), **JetBrains Mono** (records, datelines, fixture chips)
+- ESPN public API (no auth) + Anthropic API (tactical reads only, only on button press)
+- `anthropic` SDK pinned in requirements.txt
+- Google Fonts via CDN: **Saira Condensed** (display/scores/tabs — 700 italic = section tags), **Instrument Sans** (body/UI), **JetBrains Mono** (records, datelines, facts labels)
 
 ## Running
 ```
 pip install --user --break-system-packages -r requirements.txt
 python app.py
 ```
-Server runs on http://localhost:5000 with debug/auto-reload enabled.
+Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **dry-run mode** (canned sections, $0) until `ANTHROPIC_API_KEY` is set in the environment; `PREVIEW_MODEL` optionally overrides the default `claude-opus-4-8` (e.g. `claude-sonnet-5` for cheaper presses). Both are env vars — set in the Render dashboard for prod, never committed.
 
 ## API Routes
-- `GET /api/schedule?month=YYYY-MM&refresh=true` — returns games for a full calendar month (padded Mon-Sun)
-- `GET /api/standings?refresh=true` — returns standings + title race data for all tracked leagues
-- `GET /api/storylines` — active storylines for the frontend filter chips (includes optional `logo_url` per storyline)
-- `POST /api/games/<id>/watched` — toggle watched status (`{"watched": true}`)
-- `POST /api/games/<id>/notes` — save user notes (`{"notes": "..."}`)
-- Legacy `?week=prev|this|next` still supported for backward compat
+- `GET /api/schedule?month=YYYY-MM&refresh=true` — games for a padded calendar month (legacy `?week=` still supported)
+- `GET /api/standings?refresh=true` — standings + title races (soccer + NBA + NFL)
+- `GET /api/storylines` — active storyline chips (optional `logo_url` each)
+- `GET /api/games/<id>/facts?sport=&league=` — FREE facts panel (odds, form, H2H, lineups near kickoff; NFL injuries/leaders); public read, one cached ESPN summary call
+- `GET /api/games/<id>/preview` — tactical-read state: `none | pending | ready | error`
+- `POST /api/games/<id>/preview` — start generation (body: sport/league/league_name/home/away/date/venue). **Auth-gated** (spend protection); 202 + background thread; frontend polls the GET every 3s
+- `POST /api/games/<id>/watched` · `POST /api/games/<id>/notes` — user data (auth-gated)
+- Write auth: `SCHEDULE_TOKEN` env → visit `/?token=<value>` once → cookie gates all POSTs
 
 ## Key Design Decisions
-- **Fetchers**: NFL/NBA use per-day scoreboard calls via `_parallel_fetch_days`; soccer uses one date-range scoreboard call per watched league (the scoreboard endpoint accepts `dates=YYYYMMDD-YYYYMMDD` and returns every event in the window in a single response)
-- **NFL primetime detection**: converts ESPN's UTC times to Pacific, then checks local hour + broadcast network (no explicit "primetime" flag)
-- **Soccer**: requires separate API calls per league for the same team (eng.1, uefa.champions, eng.fa, etc.); Bayern / Real Madrid / Barcelona stay in `WATCHED_TEAMS` specifically so their UCL games surface
-- **Importance tiers**: `must_watch` / `notable` / `major_event` — set by `app/importance.py`
-- **NBA coverage**: only playoff and play-in games are shown — regular season is completely excluded
-- **Availability** is simple: Mon-Fri 8am-6pm PT = unavailable, everything else = available
-- **Title races** are configured in `config.TITLE_RACES` and rendered as a widget on the Tables view. Contenders sorted by standings rank ascending (not points), so tiebreakers hold. Widget header uses context-aware gap strings — `"MNC LEAD BY 5 PTS"` / `"LEVEL ON POINTS"` / `" · ARS HAVE 1 GAME IN HAND"` — with team abbreviations for scannability
-- **Storylines** are configured in `config.STORYLINES` and filter the Calendar view (chip row above grid + gold pills on matching cards). Each entry can carry an optional `logo_url` — frontend renders the logo inside a cream disc holder on the ochre pill, or falls back to text-only. Separate from `TITLE_RACES`, which stays as the Tables-view widget
-- **Series context**: `app/series_context.py` adds `series_summary` + `series_detail` to every playoff game (NBA series score, UCL leg + aggregate). Runs after `tag_playoff` and short-circuits on non-playoff games
-- **CALENDAR_EXCLUDED_LEAGUES** (in `config.py`): set of league slugs hidden from Calendar/Playoffs fetches. Standings endpoint is unaffected so the league stays visible on the Tables tab. Currently seeded `{"ger.1", "esp.1"}` — Bundesliga and La Liga. Watched teams in those leagues still surface via their UEFA competitions
-- **Followed competitions (full-tournament follow)**: `config.FOLLOWED_COMPETITIONS` (currently `["fifa.world"]` — FIFA World Cup 2026) fetches EVERY fixture in the window regardless of watched teams. Use for whole-tournament follows with no club team to track (national-team events). Implemented as "Pass 3" in the soccer fetcher (`app/espn.py`), after the watched-team and top-matchup passes, reusing the same date-range scoreboard call; a plain loop, not a thread pool, since it's a few slugs at most. World Cup standings also surface on the Tables tab (12 group tables A–L). **Status**: functional support is merged on `master` (schedule + standings + knockout tagging); the visual/design overhaul (more logos, colour, spacing/alignment fixes) is filed in `TODOS.md`, NOT yet built
-- **Month view cold load**: ~22 soccer API calls (one scoreboard range query per watched league + per-team schedules for past games); cache makes repeat visits instant
-- **Desktop vs mobile calendar**: desktop renders `calendar-grid` (month grid with dots), mobile renders `mobile-calendar` (7-day rolling window starting from today; nav arrows shift ±7 days on mobile, paginate whole months on desktop) — same DOM element, JS switches the className
-- **Day-boundary separators**: each mobile day block carries a 2px ink rule above it; desktop detail panel gets the same treatment. Within a single day, `appendGamesWithDayDivider` injects a centred italic "Coming Up" / "Live & Coming Up" divider once per day when the status transitions from `post` → `live`/`pre`
-- **Theme toggle**: light + dark, resolved in the `<head>` via an inline script BEFORE first paint (no FOUC). Precedence: `localStorage.theme` override → `prefers-color-scheme` → light default. Clicking the header toggle flips and persists to `localStorage`
-- **Today tab removed** (April 2026): Calendar is the default view and already lands on today via rolling-week + desktop scroll-to-today, so Today was duplicating itself. The "today strip" (top banner showing live / next game) stays but is PASSIVE — no `role="button"`, no `tabindex`, no click handler, no `cursor: pointer`
-- **Sticky tab bar**: `.tab-bar` sticks at `top: 0` across Calendar / Playoffs / Tables. Masthead + month-nav scroll away
-- **User data** (watched, notes) stored in `data/userdata.json` — not gitignored contents, but the directory is needed at runtime. Watched toggle lives in the expanded-card view (moved off the default meta row)
-- **Interactive elements inside game cards** (watched button, notes textarea) must call `stopPropagation()` to prevent toggling the card's expand/collapse
+- **Front Page (Home tab, landing view)**: dateline → MAIN EVENT marquee (highest `scoreMarquee()`: live > upcoming, must-watch/major/playoff boosted) → Today's Slate → storyline cards → mini standings (PL + NFL top-5 + watched rows). Desktop: 7/5 two-column grid (slate left, stories+tables rail). All blocks build from data already fetched — no front-page-specific endpoints
+- **Duel seam (the design signature)**: every game card's `.rail` is a top strip where the away team's kit color meets the home team's at an angled gradient cut. `_parse_game` extracts `color`/`alt_color` per team; JS `seamColor()` rejects too-light colors (luma > 0.82 — white kits) in favor of the alternate, else the sport fallback pair. Sport color still drives dots/pills; team color is the bold element, chrome stays quiet
+- **Single light theme**: one `:root` token block in style.css; dark mode was DELETED (not hidden) per the Jul-15 ruling. Every token pair WCAG-AA verified numerically (≥4.5:1 text, ≥3:1 UI) — keep it that way when adding tokens
+- **Tactical previews (brief D3)**: hybrid. Facts panel = free ESPN summary parse (`app/facts.py`). Read = `POST /preview` → `previews.mark_pending` → daemon thread (`app/tactical.py`) → Claude with server-side `web_search_20260209` (`max_uses=4` = cost cap), adaptive thinking, effort medium, `pause_turn` continuation (max 3) → sections stored in `data/previews.json` (`app/previews.py`, userdata pattern, gitignored, ephemeral-on-Render accepted). Background thread exists because gunicorn runs `--timeout 60`; the store is on disk so both workers see it. Output = plain text with `## ` section headings; `parse_sections` splits; frontend renders via `el()` (bullets + paragraphs, no markdown lib)
+- **Preview scope**: soccer + NFL only (`PREVIEW_SPORTS` in facts.py). Button on `pre` games; cached reads stay viewable after kickoff; "Refresh read" deliberately re-spends
+- **NFL pillar (brief D5)**: Steelers in `WATCHED_TEAMS` (id 23, must_watch) → `fetch_nfl_games` has THREE inclusion paths: watched team (slot "My Team", outranks Primetime label) / primetime / RedZone window. NFL standings = AFC/NFC conference tables with `playoffSeed` as rank (seed zones: 1 = bye, 2–7 playoff) — ESPN's v2 `level=3` division split returns empty entries, so conference view is the honest v1. `FANTASY_ROSTER` in config (name → NFL abbrev, hand-maintained post-draft) drives `app/fantasy.py` → `my_guys` on NFL games → dashed-gold "YOUR GUYS" chip
+- **Watched-row highlight is sport-scoped** in `fetch_standings` — ESPN team ids are only unique per sport (Steelers "23" ≠ NBA/soccer "23"); a flat set false-highlights other leagues
+- **Deep links**: `#front/#week/#playoffs/#tables` select a tab on load (tab clicks sync the hash); `#game-<espn id>` auto-expands that game's card — also how headless-Chrome screenshot verification reaches interactive states
+- **Importance tiers** (`app/importance.py`): must_watch / notable / major_event — all fetched NFL games are must_watch (every path implies it); soccer must-watch teams upgrade; NBA (playoffs-only coverage) = major_event
+- **Storylines** (`config.STORYLINES`) filter the Calendar and render as Front Page story cards; **TITLE_RACES** render as the Tables widget AND as richer Front Page race cards (gap headline via `buildGapString`). Front Page dedupes: a storyline whose games live in a league already covered by a race card is skipped
+- **Soccer fetch**: pass 1 per-team schedule (past games), pass 2 one date-range scoreboard call per league, pass 3 `FOLLOWED_COMPETITIONS` full-tournament follows (fifa.world). `CALENDAR_EXCLUDED_LEAGUES` hides ger.1/esp.1 from Calendar, standings unaffected
+- **Availability**: Mon–Fri 8am–6pm PT = will_miss, else can_watch
+- **Desktop vs mobile calendar**: desktop month grid + detail panel; mobile rolling 7-day window (arrows ±7 days). Mobile day blocks separated by a hairline; `appendGamesWithDayDivider` injects the "Coming Up" divider once per day
+- **User data**: `data/userdata.json` + `data/previews.json` (both gitignored) via `DATA_DIR`-resolvable paths; ephemeral on Render free tier by design
+- **Interactive elements inside cards** (watched, notes, read buttons) must call `stopPropagation()` — the card body click toggles expand/collapse
 
 ## ESPN API Gotchas
-- **Team schedule endpoint** (`/teams/{id}/schedule`) only returns PAST games — use scoreboard with a date range for future fixtures. Also strips `competition.series` / `competition.leg` / `notes` — past UCL games fetched via this path lose their round/leg metadata
-- **Scoreboard** accepts `dates=YYYYMMDD-YYYYMMDD` for ranges and `dates=YYYYMM` for whole months — one call returns every event in the window, works for both domestic leagues and cups (use this instead of per-day scanning)
-- Soccer season years use the start year: PL 2025-26 = `season=2025`
-- **Standings endpoint** is `site.api.espn.com/apis/v2/...` (v2 path), NOT `site.web.espn.com`
-- Score values for soccer come back as floats (`"2.0"`) — must cast via `int(float(val))`
-- **NBA season_type**: 2=regular, 3=playoffs, 5=play-in. Play-in games have `competition.series = {}` (empty — short-circuit in series tagger)
-- **NBA series data** lives at `competition.series` — has `summary` (pre-formatted "LAL lead series 2-1"), `totalCompetitions` (best-of-N), `competitors: [{id, wins}]`. Game 1 pre-game has `wins: 0` on both; treat as "Game 1 of N"
-- **UCL/Europa/Conference two-leg ties** expose `competition.leg = {value: 1|2}` and `competition.series.title` (round name). For 2nd-leg aggregate-going-in, the reliable source is fetching the 1st leg directly (via `fetch_first_leg`) — ESPN's `aggregateScore` field only populates after the 2nd leg completes
-- `note` field on standings entries contains zone info (Champions League, Relegation, etc.)
-- **Broadcaster names** are truncated ("USA Net", "Tele") — cleaned via `BROADCAST_DISPLAY` mapping in `espn.py`
-- **Competitor records** (`records[].summary`) must be extracted per-team from the competitor object, not the event
-- **Playoff detection** uses three belt-and-suspenders triggers — league in `KNOCKOUT_CUP_LEAGUES` (FA Cup etc.), notes keyword (`"quarterfinal"`, `"final"` etc.), OR `raw_series.title` in `KNOWN_KNOCKOUT_ROUND_TITLES` (`"Round of 16"`, `"Quarterfinals"`, `"Semifinals"`, `"Final"`, `"Knockout Round Playoffs"`). Any one is sufficient; structured-title is preferred when present
+- **Summary endpoint** (`/{sport}/{league}/summary?event=`) powers the facts panel. Soccer: form lives at `boxscore.form`, prior meetings at **`headToHeadGames`** (not `headToHead`), `rosters[].roster` is EMPTY until near kickoff (formation + starters appear late). NFL: `injuries` (per team, athlete + status), `leaders` (nested three levels), `lastFiveGames` often null. Parse defensively — facts are garnish, never a 500
+- **NFL v2 standings**: children = 2 conferences; entries carry `playoffSeed` (no plain `rank`), `wins/losses/ties/winPercent/streak/divisionRecord`; `?level=3` (divisions) returns children with EMPTY entries — don't chase it
+- **Team scoreboard colors**: competitor `team.color`/`alternateColor` are bare hex WITHOUT `#`, missing on some events, and can be white (e.g. England `FFFFFF`) — hence the frontend luma guard
+- **Team schedule endpoint** only returns PAST games — use scoreboard `dates=YYYYMMDD-YYYYMMDD` ranges for futures; team-schedule path strips `series`/`leg`/`notes`
+- Soccer season years use the start year (PL 2025-26 = `season=2025`); soccer scores arrive as floats (`"2.0"` → `int(float(v))`)
+- **Standings** use the `site.api.espn.com/apis/v2/...` path; `note` on entries = zone info
+- **NBA**: season_type 2/3/5 = regular/playoffs/play-in; play-in has empty `competition.series`; series data at `competition.series` (summary, totalCompetitions, competitors[].wins)
+- **UCL two-leg ties**: `competition.leg.value` + `series.title`; 2nd-leg aggregate via `fetch_first_leg` (ESPN's aggregateScore only populates post-match)
+- **Broadcaster names** truncated → `BROADCAST_DISPLAY` map; competitor records at `records[].summary` per competitor
+- **Playoff detection**: league in `KNOCKOUT_CUP_LEAGUES` OR notes keyword OR `raw_series.title` in known round titles — any one suffices
 
 ## Code Style
-- **Beginner-friendly**: clear variable names, comments on non-obvious logic
-- **No unnecessary abstractions**
-- **Frontend uses safe DOM methods** (`createElement` / `textContent`) — no `innerHTML` (security hook blocks it)
-- **Frontend uses `var`** (not `let`/`const`) and function declarations — keep consistent
-- **`el(tag, cls, txt)`** helper builds all DOM nodes; **`appendIf(parent, child)`** for nullable nodes like logos
-- **Theme** switches via `data-theme` attribute on `<html>`; every themed token lives in `:root[data-theme="light"]` and `:root[data-theme="dark"]` blocks. Add a new themed token in BOTH or it breaks
-- **Sport accents are the singular bold element per card** — tier / post-season / availability / series / league / storyline all stay grayscale-ish so the sport rail + winner-score tint pop. Any new pill or tag should follow this rule
-- **WCAG AA** (≥4.5:1 for body text, ≥3:1 for UI components) must pass in both themes before shipping any colour addition
+- **Beginner-friendly**: clear names, comments on non-obvious logic; no unnecessary abstractions
+- **Frontend uses safe DOM methods** (`createElement`/`textContent`) — no `innerHTML` (security hook blocks it); `el(tag, cls, txt)` builds nodes, `appendIf` for nullables
+- **Frontend uses `var`** and function declarations — keep consistent
+- **Single-theme tokens**: add new CSS custom properties to the ONE `:root` block; verify contrast (≥4.5:1 text / ≥3:1 UI on the surface it sits on) before shipping — the palette is documented as numerically AA-verified
+- **Color POV**: chrome near-monochrome ink; vivid color belongs to teams (seam) and sports (dots/rails). New chips/tags stay quiet (ink, outline, or gold fill)
+- **Editing app.js with tools**: the file mixes literal `\uXXXX` escapes with real Unicode in adjacent lines — exact-match string editors can fail there; a small Python splice on unambiguous anchor lines is the reliable fallback
 
 ## Project Layout
-- `app.py` — Flask entry point, creates and runs the app on port 5000
-- `config.py` — all user preferences: teams, work schedule, title races, storylines, league exclusions, followed competitions (`FOLLOWED_COMPETITIONS`), NFL network list
-- `tools/validate` — uniform validation entrypoint (workspace convention, 2026-07-12): runs the pytest suite and prints `VALIDATE PASS`. Any agent or human runs `./tools/validate` with no repo-specific knowledge
-- `TODOS.md` — repo-native idea/task inbox (capture-ritual target); sessions sweep + prune it. Currently holds the World Cup / broadsheet visual-overhaul request
-- `app/espn.py` — ESPN API client with in-memory cache; `fetch_first_leg` helper for 2nd-leg UCL aggregate lookup
-- `app/importance.py` — tier classification (`must_watch` / `notable` / `major_event`)
-- `app/availability.py` — work-hours tagging (`can_watch` / `will_miss`)
-- `app/playoff.py` — `is_playoff` + `playoff_round` tagging; three-trigger detection (league list / notes keyword / structured title)
-- `app/series_context.py` — `series_summary` + `series_detail` per playoff game (NBA score, UCL leg + aggregate)
-- `app/storylines.py` — narrative tagging (`storylines: [{id, label, logo_url?}]` per game) driven by `config.STORYLINES`
-- `app/routes.py` — Flask routes: `/api/schedule`, `/api/standings`, `/api/storylines`, `/api/games/<id>/watched|notes`
-- `app/userdata.py` — watched flags + notes persistence (JSON file in `data/userdata.json`)
-- `templates/index.html` — single-page HTML shell; inline FOUC-safe theme script in `<head>`, theme-toggle button in header
-- `static/app.js` — all frontend rendering (calendar grid, detail panel, standings tables, title race widget, cards with the broadsheet DOM pattern)
-- `static/style.css` — full broadsheet style system: per-theme tokens, typography, cards, tables, responsive rules
+- `app.py` — Flask entry point (port 5000)
+- `config.py` — teams (soccer + Steelers), work schedule, title races, storylines, league exclusions, `FOLLOWED_COMPETITIONS`, `FANTASY_ROSTER`, NFL networks
+- `PRODUCT_BRIEF.md` — converged product decisions D1–D8; if code contradicts it, the brief wins or gets amended first
+- `tools/validate` — uniform validation entrypoint (pytest + `VALIDATE PASS`)
+- `TODOS.md` — repo-native idea/task inbox
+- `app/espn.py` — ESPN client + cache; fetchers (incl. NFL 3-path), standings (incl. NFL), `fetch_first_leg`
+- `app/facts.py` — summary fetch + per-sport facts parsing (`PREVIEW_SPORTS`)
+- `app/previews.py` — tactical-read JSON store (pending/ready/error)
+- `app/tactical.py` — prompt builder, Claude call (web search, cost caps), dry-run mode, background thread
+- `app/fantasy.py` — `my_guys` tagger from `FANTASY_ROSTER`
+- `app/importance.py` · `app/availability.py` · `app/playoff.py` · `app/series_context.py` · `app/storylines.py` — game taggers
+- `app/routes.py` — all routes; tagging chain ends `tag_storylines` → `tag_my_guys`
+- `app/userdata.py` — watched/notes JSON store (defines the shared `_resolve_data_dir`)
+- `templates/index.html` — single-page shell: masthead, sticky tab bar (Home/Calendar/Playoffs/Tables), view containers
+- `static/app.js` — all rendering: front page (marquee/slate/stories/minis), calendar, playoffs, tables (soccer/NBA/NFL builders), cards + duel seam, match intel (facts + read), deep links
+- `static/style.css` — the light design system: tokens, section tags, cards/seam, front page, calendar, tables, intel, responsive
 
 ## Testing
-Pytest suite in `tests/` covers availability, importance, userdata, playoff tagging, series context, storylines, auth, and ESPN parsing helpers (no network). Run: `./tools/validate` (the uniform entrypoint — runs the suite, prints `VALIDATE PASS`) or `python3 -m pytest tests/ -v` directly.
+Pytest suite in `tests/` — 123 tests: availability, importance, userdata, playoff tagging, series context, storylines, auth (incl. preview spend gate), ESPN parsing, NFL inclusion + standings mapping, fantasy tagger, facts parsing (fixtures from live-probed shapes), preview store + dry-run pipeline. Run `./tools/validate`.
 
-For anything touching the UI or live ESPN responses, still verify manually by running the app and exercising the feature in a browser.
+UI or live-ESPN work still needs a manual run: `python app.py`, browse, and screenshot (headless Chrome + `#hash` deep links reach every state, including expanded cards via `#game-<id>`).
 
 ## Known TODOs / deferred features
-Flagged by the user across sessions — not currently scheduled:
-- **Team detail view**: click a team (logo/name) → dedicated page for that team's recent results, upcoming fixtures, current form, standings position. Needs investigation of ESPN's team-summary endpoints
-- **NFL draft pick tracker**: follow the draft live and log my team's picks. Needs investigation of ESPN's draft feed
-- **Phase 3 broadsheet polish**: any real-phone rendering issues found after the Render deploy (font loading, sticky-tab quirks on iOS Safari, viewport math on notched devices, etc.) will be triaged in a separate session
-- Past UCL games fetched via team-schedule lose their `series`/`leg`/`notes` metadata (noted inline in `fetch_first_leg` docstring); score still visible on the card so it's an acceptable trade-off, but a future fetch-path rework could recover the round label and aggregate
+- **Deferred by the revamp interview (brief §D8)**: milestone watch · your-teams strip · NBA tactical previews · NFL draft/offseason tracker · ESPN-fantasy roster auto-pull · MLB/NHL
+- **Dylan's future steps**: set `ANTHROPIC_API_KEY` (+ optional `PREVIEW_MODEL`) on Render + locally when he wants live reads; fill `FANTASY_ROSTER` after the LPPC draft (late Aug); real-phone pass after deploy (fonts, sticky tabs on iOS, notch viewport)
+- **Team detail view** (click team → results/fixtures/form page) — needs ESPN team-summary endpoint investigation
+- NFL mini table on Home currently shows the FIRST conference group (AFC — the Steelers' conference); NFC visible on Tables
+- Past UCL games via team-schedule lose series/leg metadata (accepted; noted in `fetch_first_leg` docstring)
