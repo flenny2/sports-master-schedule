@@ -3,7 +3,7 @@
 what: Dylan's meta sports tracker / fan-experience hub — Front Page (marquee + slate + storylines + tables), calendar, playoffs, standings, and ON-DEMAND Claude tactical previews; Flask + vanilla HTML/CSS/JS, ESPN public API, in-memory cache, no DB and no build step
 rules: docs describe `master` only; NEVER `git push` (push = Render auto-deploy — shipping is Dylan's call); run `./tools/validate` before shipping; SINGLE LIGHT THEME — one `:root` token block, no dark mode, no toggle (Dylan Jul-15 ruling); preview generation is on-demand ONLY (spend = button press, never automatic)
 links: product truth `PRODUCT_BRIEF.md` (D1–D8, interview-converged Jul-17) · deploy config `render.yaml` (Render free tier) · idea/task inbox `TODOS.md` · cross-project style rulings `personal-style-tracker/`
-updated: 2026-07-18
+updated: 2026-07-20
 
 Dylan's fan hub — phone-first (deployed Render URL). Visual identity: **"broadcast graphics, in daylight"** — bright cool-white surfaces, near-monochrome ink chrome, ALL vivid color from teams/sports, ink "lower-third" section tags with a gold lead, and the signature **team-color duel seam** across each game card's top edge.
 
@@ -98,3 +98,50 @@ UI or live-ESPN work still needs a manual run: `python app.py`, browse, and scre
 - **Team detail view** (click team → results/fixtures/form page) — needs ESPN team-summary endpoint investigation
 - NFL mini table on Home currently shows the FIRST conference group (AFC — the Steelers' conference); NFC visible on Tables
 - Past UCL games via team-schedule lose series/leg metadata (accepted; noted in `fetch_first_leg` docstring)
+
+## Season rollover checklist (do every August)
+Several config artifacts are pinned to a specific season and go stale silently — nothing
+crashes, the app just quietly shows the wrong thing (a dead filter chip, last season's title
+race, a missing primetime game). Walk this list when the new season's fixtures drop, usually
+early-to-mid August. Line numbers are current as of the 2026-07-20 salvage but drift — `grep`
+the token if a pointer misses.
+
+- **`STORYLINES` — retire the expired entry, add the new season's** (`config.py:113`; schema
+  comment above it `config.py:91-112`; gate in `app/storylines.py:get_active_storylines`,
+  line 92). Entries carry an `end_date` (`config.py:124` — currently `"2026-05-31"` on
+  `pl_title_race_25_26`, label "PL Title Race"). `get_active_storylines` drops any storyline
+  past its `end_date`, so an expired one correctly stops shipping a chip — but nothing replaces
+  it, and the Calendar loses its storyline filter entirely until a new entry is added. Bump the
+  `id`/`label`/`description` to the new season and set a fresh `end_date`. **As of the 2026-07-20
+  salvage this is still pending** — the 25-26 entry expired May 31 and no live storyline exists.
+  (Leaving an entry `active` past its `end_date` was the dead-PL-chip bug; the date gate is the
+  fix, not a reason to skip this.)
+- **`TITLE_RACES` — re-pick the contenders and relabel** (`config.py:83`). Currently Arsenal +
+  Man City (`team_ids: ["359", "382"]`) under label `"Premier League Title Race"`. Consumed by
+  `get_title_races()` (`app/espn.py:787`; loop `for race_cfg in config.TITLE_RACES` at 794).
+  Contenders are hand-picked, so last season's two-horse race persists into the new season until
+  edited.
+- **`NFL_PRIMETIME_NETWORKS` — re-verify against the new slate's rights deals** (`config.py:157`;
+  consumed at `app/espn.py:407`). A game is included if it's primetime by weekday+hour **or** airs
+  on a network in this set. The weekday branches (`app/espn.py:388-411`) cover Thu/Sun/Mon/Sat
+  **only — there is no Friday branch**, so a Friday game is included *solely* via this network set.
+  That's why `"Netflix"` is in it: Christmas 2026 falls on a Friday and the NFL Christmas games
+  stream on Netflix, so both inclusion paths fail without it. Pinned by `tests/test_nfl_primetime.py`
+  (Netflix Friday included; CBS Friday excluded — the fix stays specific, it doesn't blanket-include
+  every Friday evening). If a streaming rights deal moves, update this set or those games vanish
+  from the schedule with no error.
+- **The `38 - gp` max-points assumption is Premier-League-only** (`app/espn.py:815`, inside
+  `get_title_races()`). `remaining = 38 - gp` hardcodes a 38-match season, but the loop runs over
+  **every** `TITLE_RACES` entry (`app/espn.py:794`), not just `eng.1`. La Liga and Serie A are also
+  38 so they'd happen to work; **Bundesliga and Ligue 1 play 34**, so a title race in either would
+  over-count remaining matches by 4 (12 points) — silently wrong output, no exception. Add a
+  per-league match-count lookup before configuring a non-38-match race.
+- **`NBA_NATIONAL_NETWORKS` is dead code, and NBA is unplugged — decide, then act** (`config.py:161`).
+  Defined once and referenced nowhere else (verified 2026-07-20). Its comment (`config.py:159-160`)
+  still claims "playoff games ... and nationally televised regular season", which is doubly wrong now:
+  the live NBA rule is playoff/play-in only (`fetch_nba_games`, `app/espn.py:524`), AND since the
+  brief-A1 revamp NBA is **unplugged entirely** — out of the fetchers, standings, and filter chips,
+  kept only for a one-line restore (see the `get_all_games`/`get_all_standings` restore comments and
+  the "NBA unplugged" notes in Key Design Decisions). So this set backs nothing. Either delete it, or
+  if NBA is ever restored re-wire it deliberately — don't leave a comment implying regular-season
+  national-TV coverage that no code path provides.
