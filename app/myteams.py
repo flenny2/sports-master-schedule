@@ -31,6 +31,7 @@ from app.espn import (
     _MAX_WORKERS,
     fetch_team_schedule,
     fetch_upcoming_fixtures,
+    games_played,
     get_all_standings,
 )
 
@@ -160,13 +161,6 @@ def _standings_entry(standings, team):
     return None, None, None
 
 
-def _games_played(sport, stats):
-    """How many games the table credits this team with."""
-    if sport == "soccer":
-        return _score_int(stats.get("gp")) or 0
-    return sum(_score_int(stats.get(key)) or 0 for key in ("w", "l", "t"))
-
-
 def _record_string(sport, stats):
     """Matches the mini-table convention: points for soccer, W-L(-T) else."""
     if sport == "soccer":
@@ -192,7 +186,7 @@ def _standing_row(standings, team):
         return None
 
     stats = entry.get("stats", {}) or {}
-    if _games_played(team.get("sport"), stats) == 0:
+    if games_played(team.get("sport"), stats) == 0:
         return None
 
     return {

@@ -33,7 +33,17 @@ headless-verified at 390px + 1280px. Merge + push (= Render deploy) is Dylan's c
 - [x] `app/myteams.py` + `GET /api/myteams`; strip renders above the marquee
 - [x] `tests/test_myteams.py` — 23 tests, no network
 
-## §preseason-zeros — the Home page currently states standings that don't exist
+## §preseason-zeros — FIXED 2026-07-22 on `ws/preseason-zeros` (Dylan: "Fix the zeros")
+
+`fetch_standings` now sets `preseason: True` when every row is at 0 games played
+(`app/espn.py:games_played`, the same rule the strip uses), `get_title_races` carries it,
+and all four render sites honour it: mini tables and Tables sections show
+"Season hasn't started — no games played yet." instead of a zeroed alphabetical table;
+the race headline reads "SEASON OPENS AUG 21" instead of "LEVEL ON POINTS"; the race
+widget drops its rank number and leader highlight (the 0 pts / 0 GP / 38 left stat boxes
+stay — those are true). 178 tests green, headless-verified. Original report below.
+
+## §preseason-zeros (original report) — the Home page stated standings that don't exist
 
 Found while building the strip (Jul-22, evidenced by headless screenshots). Between
 seasons ESPN zeroes every stat and sorts tables ALPHABETICALLY, and two Home blocks

@@ -845,6 +845,15 @@ function buildMiniTable(lg) {
         return t.is_watched;
     });
 
+    // Pre-season the rows are alphabetical at 0-0 — "top 5" would be a
+    // ranking nobody has earned. Say so instead of drawing a fake table.
+    if (lg.preseason) {
+        card.appendChild(el("div", "tbl-preseason",
+            "Season hasn't started — no games played yet."));
+        card.appendChild(buildFullTablesLink());
+        return card;
+    }
+
     top.concat(extras).forEach(function(entry) {
         var row = el("div", "mini-row" + (entry.is_watched ? " watched" : ""));
         row.appendChild(el("span", "mini-rank", entry.rank));
@@ -862,11 +871,15 @@ function buildMiniTable(lg) {
         card.appendChild(row);
     });
 
+    card.appendChild(buildFullTablesLink());
+    return card;
+}
+
+function buildFullTablesLink() {
     var more = el("button", "mini-more", "Full tables →");
     more.type = "button";
     more.addEventListener("click", function() { switchView("tables"); });
-    card.appendChild(more);
-    return card;
+    return more;
 }
 
 /** Pulse red dot on the Playoffs tab when a playoff game is live */
@@ -2053,6 +2066,14 @@ function renderTables(leagues) {
  *    "ARS LEAD BY 2 PTS · MNC HAVE 2 GAMES IN HAND"
  */
 function buildGapString(race) {
+    // Pre-season every contender sits on 0 pts, so "LEVEL ON POINTS"
+    // would dress an unplayed season up as a dead heat. Say when play
+    // starts instead — the upcoming fixtures behind it are real.
+    if (race.preseason) {
+        var opener = raceOpenerDate(race);
+        return opener ? "SEASON OPENS " + opener : "SEASON NOT STARTED";
+    }
+
     var leader = race.contenders[0];
     var chaser = race.contenders[1];
     var gap = race.gap;
@@ -2084,6 +2105,20 @@ function buildGapString(race) {
     return parts.join(" · ");
 }
 
+/** Earliest fixture across a race's contenders, as "AUG 21" */
+function raceOpenerDate(race) {
+    var earliest = null;
+    race.contenders.forEach(function(c) {
+        (c.upcoming || []).forEach(function(f) {
+            if (!earliest || f.date < earliest) earliest = f.date;
+        });
+    });
+    if (!earliest) return "";
+    return new Date(earliest).toLocaleDateString("en-US", {
+        month: "short", day: "numeric"
+    }).toUpperCase();
+}
+
 function buildTitleRace(race) {
     var widget = el("div", "race-widget");
 
@@ -2098,11 +2133,16 @@ function buildTitleRace(race) {
     // Contender rows (3 stats: PTS / GP / LEFT \u2014 the actionable trio)
     var body = el("div", "race-body");
     race.contenders.forEach(function(c, idx) {
+        // No leader before a ball is kicked: pre-season "rank" is just
+        // alphabetical order, so drop both the number and the highlight.
+        // The stat boxes stay — 0 pts from 0 games is simply true.
         var row = el("div",
-            "race-row" + (idx === 0 ? " race-leader" : ""));
+            "race-row" + (idx === 0 && !race.preseason ? " race-leader" : ""));
 
         var team = el("div", "race-team");
-        team.appendChild(el("span", "race-rank", c.rank + "."));
+        if (!race.preseason) {
+            team.appendChild(el("span", "race-rank", c.rank + "."));
+        }
         appendIf(team, logoImg(c.team.logo, 28));
         team.appendChild(el("span", "race-name", c.team.name));
         row.appendChild(team);
@@ -2159,6 +2199,16 @@ function buildLeagueSection(league) {
 
     // Body: groups
     var body = el("div", "tbl-section-body");
+
+    // Same rule as the Home mini-table: a zeroed, alphabetically-sorted
+    // table isn't a standing, so don't draw one. The zone legend is
+    // skipped too — there are no zones to be in yet.
+    if (league.preseason) {
+        body.appendChild(el("div", "tbl-preseason",
+            "Season hasn't started — no games played yet."));
+        section.appendChild(body);
+        return section;
+    }
 
     league.groups.forEach(function(group) {
         if (league.groups.length > 1) {

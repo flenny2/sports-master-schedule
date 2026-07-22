@@ -610,6 +610,26 @@ def _stat_val(stats_list, name, default=""):
     return default
 
 
+def games_played(sport, stats):
+    """
+    How many games a standings row has been credited with.
+
+    Public because two callers need to agree on it: fetch_standings (to
+    flag a table as pre-season) and app/myteams.py (to suppress a
+    fabricated rank on the Front Page strip).
+    """
+    def _num(raw):
+        try:
+            return int(float(raw))
+        except (TypeError, ValueError):
+            return 0
+
+    if sport == "soccer":
+        return _num(stats.get("gp"))
+    # football + basketball count from the W/L(/T) record
+    return sum(_num(stats.get(key)) for key in ("w", "l", "t"))
+
+
 def fetch_standings(sport, league_slug):
     """
     Fetch standings for a sport/league.
@@ -709,10 +729,22 @@ def fetch_standings(sport, league_slug):
             "teams": teams,
         })
 
+    # Between seasons ESPN zeroes every stat and then sorts the table
+    # ALPHABETICALLY. Probed Jul-22: the Premier League read Bournemouth
+    # 1st / Arsenal 2nd / Man City 15th, all on 0 pts, and every NFL team
+    # sat at rank 0. The numbers are honest (nobody HAS played); the
+    # ORDER is not a standing. Flag it so render sites can decline to
+    # present that order as one.
+    all_entries = [t for group in groups for t in group["teams"]]
+    preseason = bool(all_entries) and all(
+        games_played(sport, entry["stats"]) == 0 for entry in all_entries
+    )
+
     return {
         "id": league_slug,
         "name": league_name,
         "sport": sport,
+        "preseason": preseason,
         "groups": groups,
     }
 
@@ -852,6 +884,9 @@ def get_title_races():
             "label": race_cfg["label"],
             "league": league_slug,
             "league_name": standing["name"],
+            # Carried, not used to drop the race: the fixtures below are
+            # real and worth showing: only the gap/rank would be fiction.
+            "preseason": standing.get("preseason", False),
             "contenders": contenders,
             "gap": leader["pts"] - challenger["pts"],
             "games_in_hand": challenger["remaining"] - leader["remaining"],

@@ -436,6 +436,15 @@ header {
 .mt-res-l { background: var(--live); }
 .mt-res-d { background: var(--ink-2); }
 
+/* Off-season stand-in for a table that would otherwise show a zeroed,
+   alphabetically-sorted "standing" (mini tables + Tables sections). */
+.tbl-preseason {
+  font-family: var(--f-body);
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  padding: 14px 2px;
+}
+
 .myteam-empty {
   font-family: var(--f-body);
   font-size: 0.84rem;
