@@ -17,6 +17,19 @@ WORK_SCHEDULE = {
 # ── Teams you follow ──────────────────────────────────────────────
 # Each team has an ESPN ID, the leagues to check, and an importance tier.
 # Tiers: "must_watch", "notable", "major_event"
+#
+# Optional "favorite": True marks a team for the Front Page "Your Teams"
+# strip (app/myteams.py). It is deliberately SEPARATE from "tier" because
+# the two answer different questions:
+#   tier     — how loudly should this team's GAMES shout? (drives
+#              app/importance.py and the marquee scorer)
+#   favorite — is this one of Dylan's own teams? (drives the strip)
+# Dylan, Jul-22: "Steelers and Man City are my favorite teams. Arsenal
+# and Bayern were because I was following the champions league... and I
+# forgot to say Arsenal for the premier league race as well." So Arsenal
+# stays must_watch (he follows the race it contests, and it's a
+# TITLE_RACES contender) but isn't a favorite — its race story already
+# has a Front Page card, and a strip entry would be a third surface.
 WATCHED_TEAMS = [
     {
         "name": "Manchester City",
@@ -24,6 +37,7 @@ WATCHED_TEAMS = [
         "sport": "soccer",
         "leagues": ["eng.1", "uefa.champions", "eng.fa", "eng.league_cup"],
         "tier": "must_watch",
+        "favorite": True,
     },
     {
         "name": "Arsenal",
@@ -64,6 +78,7 @@ WATCHED_TEAMS = [
         "sport": "football",
         "leagues": ["nfl"],
         "tier": "must_watch",
+        "favorite": True,
     },
 ]
 

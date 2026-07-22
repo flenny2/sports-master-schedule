@@ -321,6 +321,129 @@ header {
   margin: 2px 0 14px;
 }
 
+/* ── Your Teams strip (brief D8) ────────────────────────────────
+   Favorites glance, directly under the dateline. Horizontal + snapping
+   on a phone so the next card peeks and advertises the scroll; even
+   columns once there's room. No new tokens — the palette stays as
+   numerically verified. */
+.fp-myteams-strip {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.fp-myteams-strip::-webkit-scrollbar { display: none; }
+
+.myteam-card {
+  /* Explicit basis, not `auto` — content-sized cards come out uneven and
+     leave the next one peeking by ~10px, which reads as a clipped card
+     rather than "scroll me". */
+  flex: 0 0 min(76%, 320px);
+  scroll-snap-align: start;
+  background: var(--surface);
+  border: 1px solid var(--rule-hl);
+  /* JS replaces the left edge with the team's kit color (seamColor) */
+  border-left: 3px solid var(--ink-3);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px;
+}
+@media (min-width: 560px) {
+  .fp-myteams-strip { overflow-x: visible; }
+  .myteam-card { flex: 1 1 0; }
+}
+
+.myteam-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+.myteam-head img {
+  width: 26px; height: 26px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.myteam-name {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 1.12rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.myteam-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+.myteam-row + .myteam-row { margin-top: 8px; }
+.mt-label {
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  flex: 0 0 34px;
+}
+.mt-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.mt-fix {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 1.02rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+.mt-meta {
+  font-family: var(--f-body);
+  font-size: 0.76rem;
+  color: var(--ink-2);
+  flex-basis: 100%;
+}
+.mt-note {
+  font-family: var(--f-body);
+  font-size: 0.74rem;
+  color: var(--gold-text);
+  flex-basis: 100%;
+}
+
+/* Result glyph. Colour here is DATA (a result), not chrome — both fills
+   clear AA against white text (--live 5.0:1, --ok 5.6:1). */
+.mt-res {
+  font-family: var(--f-mono);
+  font-weight: 700;
+  font-size: 0.68rem;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: #FFFFFF;
+  background: var(--ink-2);
+}
+.mt-res-w { background: var(--ok); }
+.mt-res-l { background: var(--live); }
+.mt-res-d { background: var(--ink-2); }
+
+.myteam-empty {
+  font-family: var(--f-body);
+  font-size: 0.84rem;
+  color: var(--ink-2);
+  padding-top: 8px;
+  border-top: 1px solid var(--rule);
+}
+
 /* Hero — the marquee game, bigger everything */
 .fp-hero .game-card { box-shadow: var(--shadow-lift); }
 .fp-hero-note {

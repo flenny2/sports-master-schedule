@@ -28,6 +28,8 @@ var lastMobileState = null;  // track viewport changes
 var storylinesData = [];     // [{id, label, description, logo_url?}]
 var activeStorylineId = null; // currently-selected filter, or null
 var initialScrollDone = false; // desktop: scroll-to-today only once per load
+var myTeamsData  = [];       // "Your Teams" strip cards (brief D8)
+var myTeamsLoaded = false;
 var mobileWindowStart = null;  // mobile 7-day window start, "YYYY-MM-DD"
 
 var MOBILE_BP = 640;
@@ -521,6 +523,12 @@ function renderFrontPage(games) {
     grid.appendChild(colRail);
     frontView.appendChild(grid);
 
+    // Your Teams strip — sits above the marquee (Dylan, Jul-22) so the
+    // "how are my teams doing" glance survives the off-season, when
+    // there's no slate and no marquee to headline the page.
+    var myTeams = buildMyTeamsStrip();
+    if (myTeams) colMain.appendChild(myTeams);
+
     // ── Marquee — the one game that headlines today ──────────────
     var marquee = pickMarqueeGame(todayGames);
     if (marquee) {
@@ -589,6 +597,106 @@ function buildNextUpCard(g) {
         fmtDateShort(nextDateStr) + " · " + fmtTime(g.date) +
         " · in " + countdownText(g.date)));
     return card;
+}
+
+/** "Your Teams" strip: one card per favorite team (config `favorite`)
+ *  — next fixture, last result, table position. Blocks are omitted
+ *  rather than shown empty; a card with nothing to say says so. */
+function buildMyTeamsStrip() {
+    if (!myTeamsLoaded || !myTeamsData.length) return null;
+
+    var block = el("div", "fp-block fp-myteams");
+    block.appendChild(el("span", "sec-tag", "Your Teams"));
+    var strip = el("div", "fp-myteams-strip");
+    myTeamsData.forEach(function(t) {
+        strip.appendChild(buildMyTeamCard(t));
+    });
+    block.appendChild(strip);
+    return block;
+}
+
+function buildMyTeamCard(t) {
+    var card = el("div", "myteam-card");
+
+    // Accent bar in the team's kit color, same luma guard as the duel
+    // seam. The team-schedule endpoint strips colors, so in practice
+    // this resolves to the sport fallback — which still tells NFL and
+    // soccer cards apart at a glance.
+    var pair = SPORT_SEAM[t.sport] || SPORT_SEAM.soccer;
+    card.style.borderLeftColor = seamColor(
+        { color: t.color, alt_color: t.alt_color }, pair[0]);
+
+    var head = el("div", "myteam-head");
+    appendIf(head, logoImg(t.logo, 26));
+    head.appendChild(el("span", "myteam-name", t.name));
+    card.appendChild(head);
+
+    appendIf(card, t.next ? buildMyTeamNext(t.next) : null);
+    appendIf(card, t.last ? buildMyTeamLast(t.last) : null);
+    appendIf(card, t.standing ? buildMyTeamStanding(t.standing) : null);
+    if (!t.next && !t.last && !t.standing) {
+        card.appendChild(el("div", "myteam-empty", "Season not started"));
+    }
+    return card;
+}
+
+/** Shared row scaffold: small ink label + stacked body */
+function myTeamRow(cls, label) {
+    var row = el("div", "myteam-row " + cls);
+    row.appendChild(el("span", "mt-label", label));
+    row.appendChild(el("div", "mt-body"));
+    return row;
+}
+
+/** Local calendar date for a game's ISO timestamp */
+function myTeamDay(iso) {
+    return fmtDateShort(new Date(iso).toLocaleDateString("en-CA"));
+}
+
+function buildMyTeamNext(next) {
+    var row = myTeamRow("myteam-next", "Next");
+    var body = row.lastChild;
+    body.appendChild(el("span", "mt-fix",
+        (next.home ? "vs " : "at ") + next.opponent));
+    var meta = myTeamDay(next.date) + " \u00b7 in " + countdownText(next.date);
+    if (next.league_name) meta = next.league_name + " \u00b7 " + meta;
+    body.appendChild(el("span", "mt-meta", meta));
+    return row;
+}
+
+function buildMyTeamLast(last) {
+    var row = myTeamRow("myteam-last", "Last");
+    var body = row.lastChild;
+    body.appendChild(el("span",
+        "mt-res mt-res-" + last.outcome.toLowerCase(), last.outcome));
+    body.appendChild(el("span", "mt-fix",
+        last.score + " " + (last.home ? "vs " : "at ") + last.opponent));
+    var meta = myTeamDay(last.date);
+    if (last.league_name) meta = last.league_name + " \u00b7 " + meta;
+    body.appendChild(el("span", "mt-meta", meta));
+    // ESPN's decider text for a drawn knockout tie ("... win 4-3 on
+    // penalties") — a bare "D" would misreport how the tie ended.
+    if (last.note) body.appendChild(el("span", "mt-note", last.note));
+    return row;
+}
+
+function buildMyTeamStanding(st) {
+    var row = myTeamRow("myteam-standing", "Table");
+    var body = row.lastChild;
+    body.appendChild(el("span", "mt-fix",
+        ordinal(st.rank) + " \u00b7 " + st.record));
+    var where = shortenGroup(st.group) || st.league_name;
+    if (where) body.appendChild(el("span", "mt-meta", where));
+    return row;
+}
+
+/** "American Football Conference" -> "AFC". Conference names are far too
+ *  long for a compact card; short names pass through untouched. */
+function shortenGroup(name) {
+    if (!name || name.length <= 18) return name || "";
+    return name.split(/\s+/).map(function(w) {
+        return w.charAt(0);
+    }).join("").toUpperCase();
 }
 
 /** Storyline cards: title races (rich standings data) first, then
@@ -850,6 +958,21 @@ function updateStorylineFilterVisibility() {
     } else {
         hide(storylineFilters);
     }
+}
+
+/** Eagerly load the "Your Teams" strip cards (brief D8) */
+function loadMyTeams() {
+    fetch("/api/myteams").then(function(r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+    }).then(function(data) {
+        myTeamsData = data.teams || [];
+        myTeamsLoaded = true;
+        // Front page renders the strip — refresh if it's on screen
+        if (currentView === "front") render();
+    }).catch(function() {
+        // Non-critical — the strip just won't appear
+    });
 }
 
 /** Eagerly load standings so expanded cards can show context */
@@ -2334,3 +2457,4 @@ if (isMobile()) initMobileWindowIfNeeded();
 loadSchedule();
 loadStandings();
 loadStorylines();
+loadMyTeams();

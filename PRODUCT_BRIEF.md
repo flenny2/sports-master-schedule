@@ -128,6 +128,26 @@ not v1.
   one-line restore). Sport order app-wide is **NFL first, then Soccer** (chips, Tables,
   Front Page minis). Sport filter chips carry glyph icons instead of color dots.
 
+- **A2 (2026-07-22, first §D8 item built):** the **your-teams strip** ships, promoted out
+  of D8's deselected list. It lands directly under the dateline, above the marquee —
+  chosen because in the off-season (no slate, no marquee, expired storyline) it is the
+  only live content the Front Page has.
+
+  The interview left "Dylan's teams" as one flat `WATCHED_TEAMS` list. Asked point-blank
+  whose teams belong on the strip, he split it three ways — **record this, because the
+  config shape alone doesn't show it:**
+
+  | team | relationship | surface |
+  |---|---|---|
+  | Steelers, Man City | **favorite teams** | the strip (config `favorite: True`) |
+  | Arsenal | Premier League **title race** (+ UCL) | title-race story card |
+  | Bayern | Champions League only | game cards when it plays |
+
+  So `favorite` is a NEW config key, deliberately independent of `tier`: tier answers
+  "how loudly should this team's games shout" (importance + marquee), favorite answers
+  "is this Dylan's team". Arsenal keeps `must_watch` on the strength of the race, and is
+  intentionally absent from the strip to avoid a third Arsenal surface.
+
 ## Appendix — interview record (Jul-17, 3 rounds, answers verbatim)
 
 | # | Question | Answer |

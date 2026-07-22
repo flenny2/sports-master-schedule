@@ -3,7 +3,7 @@
 what: Dylan's meta sports tracker / fan-experience hub — Front Page (marquee + slate + storylines + tables), calendar, playoffs, standings, and ON-DEMAND Claude tactical previews; Flask + vanilla HTML/CSS/JS, ESPN public API, in-memory cache, no DB and no build step
 rules: docs describe `master` only; NEVER `git push` (push = Render auto-deploy — shipping is Dylan's call); run `./tools/validate` before shipping; SINGLE LIGHT THEME — one `:root` token block, no dark mode, no toggle (Dylan Jul-15 ruling); preview generation is on-demand ONLY (spend = button press, never automatic)
 links: product truth `PRODUCT_BRIEF.md` (D1–D8, interview-converged Jul-17) · deploy config `render.yaml` (Render free tier) · idea/task inbox `TODOS.md` · cross-project style rulings `personal-style-tracker/`
-updated: 2026-07-20
+updated: 2026-07-22
 
 Dylan's fan hub — phone-first (deployed Render URL). Visual identity: **"broadcast graphics, in daylight"** — bright cool-white surfaces, near-monochrome ink chrome, ALL vivid color from teams/sports, ink "lower-third" section tags with a gold lead, and the signature **team-color duel seam** across each game card's top edge.
 
@@ -25,6 +25,7 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - `GET /api/schedule?month=YYYY-MM&refresh=true` — games for a padded calendar month (legacy `?week=` still supported)
 - `GET /api/standings?refresh=true` — standings + title races (NFL first, then soccer; NBA unplugged per brief A1)
 - `GET /api/storylines` — active storyline chips (optional `logo_url` each)
+- `GET /api/myteams?refresh=true` — "Your Teams" strip cards (one per config `favorite` team): next fixture, last result, table position. Public read, no spend
 - `GET /api/games/<id>/facts?sport=&league=` — FREE facts panel (odds, form, H2H, lineups near kickoff; NFL injuries/leaders); public read, one cached ESPN summary call
 - `GET /api/games/<id>/preview` — tactical-read state: `none | pending | ready | error`
 - `POST /api/games/<id>/preview` — start generation (body: sport/league/league_name/home/away/date/venue). **Auth-gated** (spend protection); 202 + background thread; frontend polls the GET every 3s
@@ -32,7 +33,12 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - Write auth: `SCHEDULE_TOKEN` env → visit `/?token=<value>` once → cookie gates all POSTs
 
 ## Key Design Decisions
-- **Front Page (Home tab, landing view)**: dateline → MAIN EVENT marquee (highest `scoreMarquee()`: live > upcoming, must-watch/major/playoff boosted) → Today's Slate → storyline cards → mini standings (PL + NFL top-5 + watched rows). Desktop: 7/5 two-column grid (slate left, stories+tables rail). All blocks build from data already fetched — no front-page-specific endpoints
+- **Front Page (Home tab, landing view)**: dateline → YOUR TEAMS strip → MAIN EVENT marquee (highest `scoreMarquee()`: live > upcoming, must-watch/major/playoff boosted) → Today's Slate → storyline cards → mini standings (PL + NFL top-5 + watched rows). Desktop: 7/5 two-column grid (slate left, stories+tables rail). Every block EXCEPT the strip builds from data already fetched; the strip is the one front-page-specific endpoint (see below)
+- **"Your Teams" strip (brief §D8, built Jul-22)**: `app/myteams.py` + `GET /api/myteams` → one card per config `favorite` team (Steelers, Man City) with next fixture + countdown, last result, table position. Four decisions worth keeping:
+  - **`favorite` is a separate config key from `tier`.** `tier` drives `app/importance.py` and the marquee scorer; bending it to mean "my team" would silently change which games headline the page. Arsenal is `must_watch` (Dylan follows the PL title race) but NOT `favorite` — its race already has a Front Page story card, so a strip entry would be a third Arsenal surface
+  - **It gets its own endpoint** because the strip needs games ∩ standings and no existing endpoint carries both. This is a deliberate exception to the "no front-page-specific endpoints" rule above, not an oversight
+  - **A table position is suppressed at 0 games played.** ESPN zeroes every stat in the off-season and then sorts ALPHABETICALLY — probed Jul-22, the PL read "Bournemouth 1st / Arsenal 2nd / Man City 15th" on 0 pts and every NFL team sat at rank 0. Printing that rank would state a standing that doesn't exist. (The Home **mini-tables and title-race card still show it** — pre-existing, logged in TODOS)
+  - **Assembly is server-side and pure** so the sport-scoped id matching and last/next selection are pytest-reachable; `static/app.js` only renders
 - **Duel seam (the design signature)**: every game card's `.rail` is a top strip where the away team's kit color meets the home team's at an angled gradient cut. `_parse_game` extracts `color`/`alt_color` per team; JS `seamColor()` rejects too-light colors (luma > 0.82 — white kits) in favor of the alternate, else the sport fallback pair. Sport color still drives dots/pills; team color is the bold element, chrome stays quiet
 - **Single light theme**: one `:root` token block in style.css; dark mode was DELETED (not hidden) per the Jul-15 ruling. Every token pair WCAG-AA verified numerically (≥4.5:1 text, ≥3:1 UI) — keep it that way when adding tokens
 - **Tactical previews (brief D3)**: hybrid. Facts panel = free ESPN summary parse (`app/facts.py`). Read = `POST /preview` → `previews.mark_pending` → daemon thread (`app/tactical.py`) → Claude with server-side `web_search_20260209` (`max_uses=4` = cost cap), adaptive thinking, effort medium, `pause_turn` continuation (max 3) → sections stored in `data/previews.json` (`app/previews.py`, userdata pattern, gitignored, ephemeral-on-Render accepted). Background thread exists because gunicorn runs `--timeout 60`; the store is on disk so both workers see it. Output = plain text with `## ` section headings; `parse_sections` splits; frontend renders via `el()` (bullets + paragraphs, no markdown lib)
@@ -53,7 +59,8 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - **Summary endpoint** (`/{sport}/{league}/summary?event=`) powers the facts panel. Soccer: form lives at `boxscore.form`, prior meetings at **`headToHeadGames`** (not `headToHead`), `rosters[].roster` is EMPTY until near kickoff (formation + starters appear late). NFL: `injuries` (per team, athlete + status), `leaders` (nested three levels), `lastFiveGames` often null. Parse defensively — facts are garnish, never a 500
 - **NFL v2 standings**: children = 2 conferences; entries carry `playoffSeed` (no plain `rank`), `wins/losses/ties/winPercent/streak/divisionRecord`; `?level=3` (divisions) returns children with EMPTY entries — don't chase it
 - **Team scoreboard colors**: competitor `team.color`/`alternateColor` are bare hex WITHOUT `#`, missing on some events, and can be white (e.g. England `FFFFFF`) — hence the frontend luma guard
-- **Team schedule endpoint** only returns PAST games — use scoreboard `dates=YYYYMMDD-YYYYMMDD` ranges for futures; team-schedule path strips `series`/`leg`/`notes`
+- **Team schedule endpoint is SPORT-SPLIT** (re-probed Jul-22, corrects the old blanket "only returns PAST games"): `soccer/*` returns finished matches only — use scoreboard `dates=YYYYMMDD-YYYYMMDD` ranges, or `fetch_upcoming_fixtures()`, for futures. `football/nfl` returns the **whole upcoming season** (17 events, all `pre`, months ahead) and no past games by default; add `?season=YYYY` for a prior year. The team-schedule path also strips `series`/`leg`/`notes` **and `color`/`alternateColor`** — so kit colors are unavailable from it (the strip falls back to sport colors)
+- **Standings reset to zeros between seasons** and then sort ALPHABETICALLY. Probed Jul-22: PL = Bournemouth 1st / Arsenal 2nd / Man City 15th, all on 0 pts; every NFL team at `rank 0, 0-0-0`. Any feature that prints a rank must gate on games-played (`app/myteams.py:_games_played`) or it will state a standing that doesn't exist
 - Soccer season years use the start year (PL 2025-26 = `season=2025`); soccer scores arrive as floats (`"2.0"` → `int(float(v))`)
 - **Standings** use the `site.api.espn.com/apis/v2/...` path; `note` on entries = zone info
 - **NBA**: season_type 2/3/5 = regular/playoffs/play-in; play-in has empty `competition.series`; series data at `competition.series` (summary, totalCompetitions, competitors[].wins)
@@ -80,6 +87,7 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - `app/previews.py` — tactical-read JSON store (pending/ready/error)
 - `app/tactical.py` — prompt builder, Claude call (web search, cost caps), dry-run mode, background thread
 - `app/fantasy.py` — `my_guys` tagger from `FANTASY_ROSTER`
+- `app/myteams.py` — "Your Teams" strip assembly (pure helpers + `get_my_teams()`)
 - `app/importance.py` · `app/availability.py` · `app/playoff.py` · `app/series_context.py` · `app/storylines.py` — game taggers
 - `app/routes.py` — all routes; tagging chain ends `tag_storylines` → `tag_my_guys`
 - `app/userdata.py` — watched/notes JSON store (defines the shared `_resolve_data_dir`)
@@ -88,12 +96,12 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - `static/style.css` — the light design system: tokens, section tags, cards/seam, front page, calendar, tables, intel, responsive
 
 ## Testing
-Pytest suite in `tests/` — 123 tests: availability, importance, userdata, playoff tagging, series context, storylines, auth (incl. preview spend gate), ESPN parsing, NFL inclusion + standings mapping, fantasy tagger, facts parsing (fixtures from live-probed shapes), preview store + dry-run pipeline. Run `./tools/validate`.
+Pytest suite in `tests/` — 167 tests: availability, importance, userdata, playoff tagging, series context, storylines, auth (incl. preview spend gate), ESPN parsing, NFL inclusion + standings mapping, fantasy tagger, facts parsing (fixtures from live-probed shapes), preview store + dry-run pipeline, schedule-route param edges, standings fragility, my-teams strip. Run `./tools/validate`.
 
 UI or live-ESPN work still needs a manual run: `python app.py`, browse, and screenshot (headless Chrome + `#hash` deep links reach every state, including expanded cards via `#game-<id>`).
 
 ## Known TODOs / deferred features
-- **Deferred by the revamp interview (brief §D8)**: milestone watch · your-teams strip · NBA tactical previews · NFL draft/offseason tracker · ESPN-fantasy roster auto-pull · MLB/NHL
+- **Deferred by the revamp interview (brief §D8)**: milestone watch (needs a curated chase list from Dylan) · NBA tactical previews · NFL draft/offseason tracker · ESPN-fantasy roster auto-pull · MLB/NHL. ~~your-teams strip~~ BUILT Jul-22 (brief amendment A2)
 - **Dylan's future steps**: set `ANTHROPIC_API_KEY` (+ optional `PREVIEW_MODEL`) on Render + locally when he wants live reads; fill `FANTASY_ROSTER` after the LPPC draft (late Aug); real-phone pass after deploy (fonts, sticky tabs on iOS, notch viewport)
 - **Team detail view** (click team → results/fixtures/form page) — needs ESPN team-summary endpoint investigation
 - NFL mini table on Home currently shows the FIRST conference group (AFC — the Steelers' conference); NFC visible on Tables

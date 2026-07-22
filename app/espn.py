@@ -739,11 +739,15 @@ def get_all_standings():
     return results
 
 
-def _fetch_upcoming_fixtures(league_slug, team_id):
+def fetch_upcoming_fixtures(league_slug, team_id):
     """
-    Find a team's upcoming fixtures by scanning the league calendar.
-    The team schedule endpoint only returns past games, so we use the
-    scoreboard for future dates instead.
+    Find a soccer team's upcoming fixtures by scanning the league calendar.
+    The SOCCER team-schedule endpoint only returns past games, so we use
+    the scoreboard for future dates instead. (The NFL one does return
+    future games — the behaviour is sport-split; see app/myteams.py.)
+
+    Public because app/myteams.py reuses it for the "Your Teams" strip's
+    NEXT row, on top of get_title_races()'s use for race contenders.
     """
     # First get the league calendar to know which dates have games
     scoreboard_url = f"{BASE_URL}/soccer/{league_slug}/scoreboard"
@@ -815,7 +819,7 @@ def get_title_races():
                     remaining = 38 - gp
 
                     # Fetch remaining fixtures from the league calendar
-                    upcoming_list = _fetch_upcoming_fixtures(league_slug, tid)
+                    upcoming_list = fetch_upcoming_fixtures(league_slug, tid)
 
                     contenders.append({
                         "team": t["team"],

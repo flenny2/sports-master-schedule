@@ -13,6 +13,7 @@ from app.espn import get_all_games, get_all_standings, get_title_races, clear_ca
 from app.facts import PREVIEW_SPORTS, get_game_facts
 from app.fantasy import tag_my_guys
 from app.importance import tag_importance
+from app.myteams import get_my_teams
 from app.availability import tag_availability
 from app.playoff import tag_playoff
 from app.series_context import tag_series_context
@@ -237,6 +238,21 @@ def api_generate_preview(game_id):
 def api_storylines():
     """Return the active storylines for the frontend filter UI."""
     return jsonify({"storylines": get_active_storylines()})
+
+
+@main.route("/api/myteams")
+def api_my_teams():
+    """
+    Front Page "Your Teams" strip — one card per favorite team (brief §D8).
+
+    Public read like the other GETs: no writes, no spend. It gets its own
+    endpoint because the strip needs games AND standings together, and no
+    existing endpoint carries both — the one front-page block that can't
+    be assembled from what /api/schedule already returns.
+    """
+    if request.args.get("refresh") == "true":
+        clear_cache()
+    return jsonify({"teams": get_my_teams()})
 
 
 @main.route("/api/standings")
