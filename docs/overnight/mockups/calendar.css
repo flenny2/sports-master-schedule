@@ -1,0 +1,548 @@
+/* ══════════════════════════════════════════════════════════════════
+   MOCKUP STYLES — phone month calendar (overnight lane, 2026-07-26)
+
+   This file is INERT. It is never loaded by the app; the two mockup
+   pages in this folder load it directly. Nothing here changes what a
+   user sees until Dylan keeps the proposal and a later session ports
+   the marked block into static/style.css.
+
+   Two zones below:
+     ZONE 1 — COPIED VERBATIM from static/style.css so the mockups
+              look like the real app. If they drift, style.css wins.
+     ZONE 2 — NEW. This is the actual proposal: the month grid, the
+              selected-day panel, and the month nav. Only this zone
+              would be ported.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ══ ZONE 1 — copied from static/style.css ═══════════════════════ */
+
+:root {
+  --page:       #EEF1F5;
+  --page-2:     #E3E8EE;
+  --surface:    #FFFFFF;
+  --surface-2:  #F5F7FA;
+  --ink:        #0C1522;
+  --ink-2:      #4A5568;
+  --ink-3:      #8B96A5;
+  --rule:       rgba(12, 21, 34, 0.08);
+  --rule-hl:    rgba(12, 21, 34, 0.18);
+
+  --soccer:     #0E7C3A;
+  --nba:        #E25A00;
+  --nfl:        #2352E0;
+  --soccer-2:   #075E2C;
+  --nba-2:      #A84300;
+  --nfl-2:      #16359C;
+
+  --gold:       #FFC93C;
+  --gold-text:  #B45309;
+  --slate:      #334155;
+  --live:       #D31735;
+  --ok:         #0B7285;
+
+  --f-display: "Saira Condensed", "Arial Narrow", sans-serif;
+  --f-body:    "Instrument Sans", system-ui, sans-serif;
+  --f-mono:    "JetBrains Mono", monospace;
+
+  --r-card: 14px;
+  --r-chip: 8px;
+  --pad: 18px;
+  --tap-min: 44px;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-card: 0 1px 2px rgba(12, 21, 34, 0.05),
+                 0 10px 24px -18px rgba(12, 21, 34, 0.28);
+  --shadow-lift: 0 2px 4px rgba(12, 21, 34, 0.06),
+                 0 16px 32px -18px rgba(12, 21, 34, 0.32);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--f-body);
+  font-size: 15px;
+  background: var(--page);
+  color: var(--ink);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; }
+.hidden { display: none !important; }
+
+/* Section tag — the "lower third" device */
+.sec-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ink);
+  color: #FFFFFF;
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1;
+  padding: 7px 18px 7px 10px;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+}
+.sec-tag::before {
+  content: "";
+  width: 5px;
+  height: 0.85em;
+  background: var(--gold);
+  transform: skewX(-12deg);
+  flex-shrink: 0;
+}
+
+/* Game card + the duel seam signature */
+.game-card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--rule-hl);
+  border-radius: var(--r-card);
+  padding: 18px var(--pad) 14px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.game-card .rail {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 5px;
+  background: linear-gradient(
+    100deg,
+    var(--seam-a) 0%, var(--seam-a) 46%,
+    var(--surface) 46.5%, var(--surface) 53.5%,
+    var(--seam-b) 54%, var(--seam-b) 100%
+  );
+}
+.game-card.sport-soccer     { --seam-a: var(--soccer); --seam-b: var(--soccer-2); }
+.game-card.sport-basketball { --seam-a: var(--nba);    --seam-b: var(--nba-2); }
+.game-card.sport-football   { --seam-a: var(--nfl);    --seam-b: var(--nfl-2); }
+.game-card--post { background: var(--surface-2); }
+.game-card--post .rail { opacity: 0.45; }
+
+.gc-kicker {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.gc-kicker .sport-name {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 0.88rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.gc-kicker .broadcast {
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.upcoming {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.up-teams { display: grid; row-gap: 7px; min-width: 0; }
+.up-team {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 1.35rem;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  overflow: hidden;
+}
+.up-team .up-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.up-vs {
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  margin: -2px 0;
+}
+.up-time {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 2.3rem;
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.up-time small {
+  display: block;
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.6rem;
+  color: var(--ink-2);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+
+.scoreboard { display: grid; row-gap: 8px; margin-bottom: 12px; }
+.sb-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+.sb-name {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 1.45rem;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-score {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 2.4rem;
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.sb-row.loser .sb-name  { color: var(--ink-2); }
+.sb-row.loser .sb-score { color: var(--ink-3); }
+.game-card--post.sport-soccer   .sb-row:not(.loser) .sb-score { color: var(--soccer); }
+.game-card--post.sport-football .sb-row:not(.loser) .sb-score { color: var(--nfl); }
+
+.gc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding-top: 11px;
+  border-top: 1px solid var(--rule);
+}
+.tier, .gc-avail {
+  font-family: var(--f-body);
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 0 10px;
+  height: 26px;
+  border-radius: var(--r-chip);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+}
+.tier.must-watch  { background: var(--ink); color: #FFF; }
+.tier.notable     { border-color: var(--rule-hl); color: var(--ink-2); }
+.tier.major-event { background: var(--slate); color: #FFF; }
+.tier.post-season { background: var(--gold); color: var(--ink); }
+.gc-avail.can-watch { color: var(--ink-2); border-color: var(--rule-hl); }
+.gc-avail.can-watch .gc-avail-dot { background: var(--ok); }
+.gc-avail.will-miss { color: #FFF; background: var(--live); }
+.gc-avail.will-miss .gc-avail-dot { background: #FFF; }
+.gc-avail-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* Rolling 7-day list (mockup B keeps this) */
+.mobile-calendar { display: flex; flex-direction: column; padding-bottom: 22px; }
+.list-tag-row { padding: 22px var(--pad) 0; }
+.mobile-day { padding-top: 6px; }
+.mobile-day + .mobile-day { border-top: 1px solid var(--rule-hl); }
+.mobile-day-header {
+  padding: 22px var(--pad) 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.mobile-day-name {
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.55rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.mobile-day-count {
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  color: var(--ink-2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mobile-day-off { font-size: 0.88rem; color: var(--ink-2); padding: 0 var(--pad) 16px; }
+.mobile-day-games {
+  padding: 2px var(--pad) 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mobile-today-badge {
+  font-family: var(--f-body);
+  font-style: normal;
+  font-weight: 700;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  background: var(--gold);
+  color: var(--ink);
+  padding: 3px 8px;
+  border-radius: var(--r-chip);
+}
+
+/* ══ ZONE 2 — NEW. This block is the proposal. ═══════════════════
+   A 7-column month grid sized for a 390px phone. Constraints that
+   drove every number here:
+     - 390px screen - (2 x 18px page inset) = 354px of grid width.
+     - 354 / 7 = 50.6px per column, so a day cell is ~50px wide. A
+       game card cannot live in that; only a number and dots can.
+     - Cells are separated by 1px hairlines instead of gaps, because
+       at 50px a 4px gap is 8% of the cell.
+     - 6 week rows x 52px + a 22px weekday header = ~334px, which
+       clears the fold on a 390x844 phone with the masthead above it.
+   ═══════════════════════════════════════════════════════════════ */
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px var(--pad) 12px;
+}
+.month-nav-label {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 1.45rem;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.month-nav-btn {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: 1px solid var(--rule-hl);
+  background: var(--surface);
+  border-radius: var(--r-chip);
+  color: var(--ink);
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.month-nav-btn:active { background: var(--page-2); }
+
+/* The grid itself. The 1px hairline between cells is drawn by the
+   container background showing through a 1px gap — cheaper than a
+   border per cell, and it never doubles up at the seams. */
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--rule-hl);
+  border-top: 1px solid var(--rule-hl);
+  border-bottom: 1px solid var(--rule-hl);
+  margin: 0 var(--pad);
+}
+.mg-dow {
+  background: var(--page);
+  text-align: center;
+  padding: 5px 0 6px;
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.mg-cell {
+  background: var(--surface);
+  min-height: 52px;
+  padding: 5px 0 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.mg-cell.outside { background: var(--page-2); }
+.mg-cell.outside .mg-num { color: var(--ink-3); }
+.mg-cell:disabled { cursor: default; }
+
+.mg-num {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  width: 22px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Today gets the ink chip with the same angled trailing edge as the
+   section tags, so "now" reads in the app's own broadcast language
+   rather than as a generic circle. */
+.mg-cell.is-today .mg-num {
+  background: var(--ink);
+  color: #FFF;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+}
+/* Selection is a ring, never a fill — a filled selection would fight
+   the today chip on the day they are the same cell. */
+.mg-cell.selected { box-shadow: inset 0 0 0 2px var(--ink); }
+
+.mg-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 7px;
+  flex-wrap: nowrap;
+}
+.mg-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.mg-dot.soccer     { background: var(--soccer); }
+.mg-dot.football   { background: var(--nfl); }
+.mg-dot.basketball { background: var(--nba); }
+.mg-dot.dimmed     { opacity: 0.32; }
+/* The game count. Deliberately a touch larger than the first draft
+   (0.54rem): once the dots stopped counting games and started naming
+   sports, this number became the "how busy is that day" signal and
+   was the smallest thing on the screen carrying the most meaning. */
+.mg-more {
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.63rem;
+  color: var(--ink-2);
+  line-height: 1;
+  margin-left: 1px;
+}
+
+/* Legend — three sport dots, so the colours are not a private code */
+.mg-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px var(--pad) 2px;
+  font-family: var(--f-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.mg-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.mg-legend-num { font-weight: 500; color: var(--ink); }
+
+/* Selected-day panel — sits BELOW the whole grid, which is the shape
+   the desktop view already uses (renderDetail). Same app, same idea,
+   one less thing to learn. */
+.day-panel { padding: 4px 0 26px; }
+.day-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 18px var(--pad) 12px;
+}
+.day-panel-date {
+  font-family: var(--f-display);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.day-panel-count {
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  color: var(--ink-2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.day-panel-games {
+  padding: 0 var(--pad);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.day-panel-empty {
+  padding: 0 var(--pad) 8px;
+  font-size: 0.88rem;
+  color: var(--ink-2);
+}
+
+/* ══ Mockup chrome — NOT part of the proposal ════════════════════
+   Masthead + the note strip exist so the mockup reads as the app on
+   a phone. They are throwaway; nothing here gets ported. */
+.mock-mast {
+  padding: 16px var(--pad) 10px;
+  border-bottom: 1px solid var(--rule-hl);
+  background: var(--surface);
+}
+.mock-mast h1 {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.mock-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+}
+.mock-tabs span {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 6px 10px;
+}
+.mock-tabs span.on {
+  color: var(--ink);
+  box-shadow: inset 0 -3px 0 var(--gold);
+}
+.mock-note {
+  background: var(--ink);
+  color: #FFF;
+  padding: 10px var(--pad) 11px;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+.mock-note b { color: var(--gold); }
