@@ -7,7 +7,7 @@ KEEP / DISCARD column is yours; I leave it blank. IDs are never renumbered or re
 **Review board (the phone-friendly version of this file):**
 <https://claude.ai/code/artifact/a1ac028b-0ea0-47bc-b52a-918e87ce2a65> — private,
 rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL is stable.
-**Branch:** `auto/overnight-sms-ux` · **Nothing is pushed. Nothing is merged.**
+**Branch:** `auto/overnight-sms-ux` — **all three KEPT by Dylan 2026-07-26 and merged to `master` locally (`--no-ff`). STILL NOT PUSHED: push is a Render deploy and is his hand only.**
 **Suite:** 197 passed (`./tools/validate`), green at every commit on this branch.
 
 ---
@@ -39,7 +39,7 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   July/August to see that). And a mockup is not the app: wiring the winner in means
   retiring or rewiring the seven-day window code, which is a real change to a page you
   use, on a repo where shipping is a deploy.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — **KEEP** (Dylan, 2026-07-26: "Keep all 3")
 
 ### SMS-2 — The front page can name the next game again
 
@@ -62,7 +62,7 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   sounds. If ESPN fails during that scan the page quietly falls back to the old message
   rather than erroring, which is the right trade but does mean the failure is invisible.
   A gap longer than 45 days would still show the old line.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — **KEEP** (Dylan, 2026-07-26: "Keep all 3")
 
 ### SMS-3 — Option B, built for real
 
@@ -84,7 +84,7 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   a day near month-end shows fewer than seven days and offers a "More in August" button
   instead of silently pretending those days are empty. And like SMS-2 this is live code:
   keeping it means a deploy.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — **KEEP** (Dylan, 2026-07-26: "Keep all 3")
 
 ---
 
