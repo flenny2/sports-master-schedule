@@ -64,11 +64,34 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   A gap longer than 45 days would still show the old line.
 - **KEEP / DISCARD** —
 
+### SMS-3 — Option B, built for real
+
+- **WHAT** — You picked B, so the phone Calendar tab now opens on a month grid with your
+  scrolling day list still underneath it. Tap any day in the grid and the list jumps to
+  start there. The ‹ › arrows now move a **month** at a time on the phone (they used to
+  move seven days), because they have to agree with the grid above them.
+- **WHY** — "See the next few weeks at a glance" is what the grid does; the list is what
+  answers "so what's actually on". This keeps both and makes the grid steer the list.
+- **WHERE** — `static/app.js` + `static/style.css` + a new phone QA harness
+  `tools/qa-phone-calendar.py`. Commit `6e604ee`. Live shots:
+  `docs/overnight/shots/sms-3-calendar-390.png` (phone) and
+  `sms-3-calendar-desktop.png` (desktop, re-shot to prove it did not move).
+  **This supersedes SMS-1** — keeping SMS-3 is what "keep B" means in code.
+- **RISK** — The arrows changing meaning on the phone is the real one: seven days ago a
+  swipe moved you a week, now it moves you a month, and that is muscle memory you already
+  have. Three functions were deleted as part of it, so reverting is a revert of the whole
+  commit rather than a flag. The day list is also capped at the loaded month, so tapping
+  a day near month-end shows fewer than seven days and offers a "More in August" button
+  instead of silently pretending those days are empty. And like SMS-2 this is live code:
+  keeping it means a deploy.
+- **KEEP / DISCARD** —
+
 ---
 
 ## Idea queue
 
-1. ~~§mobile-month-calendar~~ → **CYCLE 1, shipped as SMS-1.**
+1. ~~§mobile-month-calendar~~ → **CYCLE 1 (mockups, SMS-1) → Dylan picked B →
+   CYCLE 3 built it for real (SMS-3). CLOSED.**
 2. ~~Off-season Home audit~~ → **CYCLE 2, shipped as SMS-2.** The audit found one real
    defect and it is fixed. Still open from the same look: the MAIN EVENT marquee — the
    front page's designed centrepiece — renders nothing at all when there are no games
@@ -94,11 +117,24 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   field can only ever mean "a fixture your window does not contain", with a test pinning
   that the key is absent in the ordinary case. 178 → 197 tests.
 
-- **PAUSED at a clean cycle boundary, 2026-07-26 evening.** Not a STOPPING line — the queue
+- **CYCLE 3 — option B built into the app — SHIPPED `6e604ee`.** Dylan answered "B, keep
+  both". Two things surfaced during the port that the mockup had hidden: the mockup's
+  weekday headers were Sunday-first while the server's padded range always starts on a
+  Monday (every column mislabelled by one day — the app was already correct, the mockup
+  was not), and "played" days rendered as 32%-opacity dots that are near-invisible at 5px
+  and cannot reach the palette's documented 3:1 at any opacity that still reads as dimmed
+  (measured: 1.67 / 2.10 / 2.54 : 1 at 32 / 45 / 55%, vs 6.26:1 solid). Played is now a
+  hollow ring — full-strength colour, and a shape difference survives colour-blindness.
+  New `tools/qa-phone-calendar.py` proxies the app and the harness through one origin so
+  the running app can be pinned to a true 390px *and* measured into; 9 asserts green,
+  including a real click that moves the real list.
+- ~~PAUSED~~ **RESUMED and paused again after cycle 3, 2026-07-26.** Original note:
+  **PAUSED at a clean cycle boundary, 2026-07-26 evening.** Not a STOPPING line — the queue
   is not empty and the lane can resume at idea 3 (phone chrome pass) whenever it is picked
   up. Paused rather than continued because SMS-1 is a question only Dylan can answer, and
   cycle 3 would stack a third undecided change on top of it.
-- **One cross-repo item owed, needs Dylan's word:** the "headless Chrome clamps its window
+- ~~One cross-repo item owed, needs Dylan's word:~~ **DONE — Dylan approved one line,
+  added as `headless-qa` rule 9 (backup `SKILL.md.bak-2026-07-26`).** Original note: the "headless Chrome clamps its window
   to 500px" finding belongs in the `headless-qa` skill (its own rule 8 says so), but that
   file lives under `~/.claude/`, which no session edits without him. Banked meanwhile in
   the repo memory `sms-session-gotchas`.

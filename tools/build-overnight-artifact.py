@@ -249,6 +249,7 @@ BOARD_CSS = """
   text-transform: uppercase;
   color: var(--txt-2);
 }
+.ba .shot.tall { height: 420px; object-position: 50% 20%; }
 .ba .shot {
   width: 100%;
   height: 300px;
@@ -336,22 +337,23 @@ BOARD_HTML = """
 
   <header class="head">
     <div class="eyebrow">Sports hub · overnight lane · night of Sat 26 Jul 2026</div>
-    <h1>The calendar,<br>two ways</h1>
+    <h1>The calendar,<br>built your way</h1>
     <p class="lede">
-      You asked for the calendar to look like an actual calendar — the full month, so you
-      can see the next few weeks at a glance. Underneath that ask there is a fork, and it
-      is a taste call, so I built both instead of picking one.
+      You picked <b>B — keep both</b>, so the phone Calendar tab now opens on a month grid
+      with your scrolling day list still underneath it. Tap a day in the grid and the list
+      jumps there. It is built, measured on a real 390px phone viewport, and waiting on
+      your branch.
     </p>
     <p class="muted">
-      Both are live and real. Tap days, use the arrows, scroll. The games are genuine ESPN
-      fixtures captured tonight. Nothing in the app has changed — these are separate pages
-      that cannot touch it.
+      The two mockups are still below, unchanged, as the record of what you were choosing
+      between. They are separate pages that cannot touch the app.
     </p>
   </header>
 
   <section class="decide">
-    <h2>The one thing to decide</h2>
-    <p>Does the month grid <b>replace</b> the scrolling list you have now, or sit <b>above</b> it?</p>
+    <h2>Decided — B</h2>
+    <p>You chose: the month grid sits <b>above</b> the scrolling list rather than replacing it.
+    Built as SMS-3 below. Here is what each option was, for the record.</p>
 
     <div class="opt">
       <span class="opt-name">A · Replace</span>
@@ -365,18 +367,16 @@ BOARD_HTML = """
     </div>
 
     <div class="rec">
-      <b>My recommendation: B.</b> Your words were "so I can see the next few weeks at a
-      glance" — that reads as something you want <em>added</em> above what is there, not a
-      swap. The scrolling list is also what actually answers "what is on this weekend", and
-      B keeps it while giving the grid a real job: steering it. B is the safer keep, too —
-      it removes nothing, so if the grid turns out to be a novelty you have lost nothing.
-      <br><br>
-      A's honest case: it is cleaner and it is less code to carry. If you find yourself
-      never scrolling past the grid, A is the better long-term shape and B was clutter.
-      Answer with one letter and the next session builds it.
+      <b>Now: three things to keep or discard.</b> SMS-1 is the mockups — pure documents,
+      keeping or discarding them changes nothing a user sees. <b>SMS-2 and SMS-3 are live
+      code</b>, so keeping either means a deploy later, by your hand. My recommendation is
+      keep all three: SMS-3 is the thing you asked for, SMS-2 removes a dead line the front
+      page shows every day until August 7, and SMS-1 is the record of why SMS-3 looks the
+      way it does.
     </div>
   </section>
 
+  <h2 style="margin-bottom:-14px">The two mockups, for the record</h2>
   <div class="switch" role="group" aria-label="Choose a layout to view">
     <button type="button" id="btn-a" aria-pressed="true">A · Replace</button>
     <button type="button" id="btn-b" aria-pressed="false">B · Keep both</button>
@@ -428,10 +428,58 @@ BOARD_HTML = """
   <section style="display:flex;flex-direction:column;gap:16px">
     <h2>The proposal</h2>
     <p class="muted">
-      Reply with IDs — "keep SMS-1 SMS-2", "discard SMS-2" — and the morning session does
-      exactly that. IDs are never reused, so they stay valid forever. SMS-1 is a choice
-      between two designs; SMS-2 is a straight keep-or-discard.
+      Reply with IDs — "keep SMS-1 SMS-2 SMS-3", "discard SMS-2" — and the next session
+      does exactly that. IDs are never reused, so they stay valid forever.
     </p>
+
+    <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-3</span>
+        <span class="prop-title">Option B, built for real</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          The phone Calendar tab now opens on a month grid, with your scrolling day list
+          still underneath it. Tap any day in the grid and the list jumps to start there.
+          The arrows move a <b>month</b> at a time on the phone now — they used to move
+          seven days — because they have to agree with the grid above them.
+        </dd></div>
+        <div><dt>On a real phone</dt><dd>
+          <div class="ba">
+            <figure>
+              <img class="shot tall" alt="The phone calendar with a month grid above the day list"
+                   src="__SHOT_CAL__">
+              <figcaption>Phone · 390px · the live app</figcaption>
+            </figure>
+            <figure>
+              <img class="shot tall" alt="The desktop calendar, unchanged"
+                   src="__SHOT_DESK__">
+              <figcaption>Desktop · unchanged</figcaption>
+            </figure>
+          </div>
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          "See the next few weeks at a glance" is the grid's job; the list is what answers
+          "so what is actually on". This keeps both and gives the grid something real to
+          do — steering the list.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          <code>static/app.js</code>, <code>static/style.css</code>, and a new phone test
+          harness <code>tools/qa-phone-calendar.py</code>. Commit <code>6e604ee</code>.
+          <b>Supersedes SMS-1</b> — keeping this is what "keep B" means in code.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          The arrows changing meaning is the real one: a swipe on the phone used to move
+          you a week and now moves you a month, and that is muscle memory you already have.
+          Three now-unused functions were deleted along with it, so undoing this is a
+          revert of the whole change rather than flipping a switch. The day list is capped
+          at the loaded month, so tapping a day near the end of the month shows fewer than
+          seven days and offers a "More in August" button rather than pretending those days
+          are empty. Live code: keeping it means a deploy.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>yours</dd></div>
+      </dl>
+    </article>
 
     <article class="prop">
       <div class="prop-head">
@@ -460,7 +508,7 @@ BOARD_HTML = """
           rewiring the seven-day window code, which is a real change to a page you use, on
           a repo where shipping is a deploy.
         </dd></div>
-        <div class="verdict"><dt>Keep / discard</dt><dd>yours — reply A, B, or discard</dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>yours — you chose B; SMS-3 is that, built</dd></div>
       </dl>
     </article>
 
@@ -593,7 +641,9 @@ def main():
         (BOARD_HTML
             .replace("__HASH__", head)
             .replace("__SHOT_BEFORE__", shot_uri("audit-home-390.png"))
-            .replace("__SHOT_AFTER__", shot_uri("sms-2-home-nextup-after.png"))),
+            .replace("__SHOT_AFTER__", shot_uri("sms-2-home-nextup-after.png"))
+            .replace("__SHOT_CAL__", shot_uri("sms-3-calendar-390.png"))
+            .replace("__SHOT_DESK__", shot_uri("sms-3-calendar-desktop.png"))),
         "<script>",
         read("data.js"),
         "</script>",
