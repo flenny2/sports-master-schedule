@@ -4,7 +4,8 @@
   rolling 7-day list and acts as its navigator.
 
   Inert. Loads only its siblings in this folder; it never touches
-  static/. Open it directly in a browser at a 390px width.
+  static/. Open it directly in a browser at a 390px width, or run
+  tools/shoot-mockups.py to measure and screenshot it.
 -->
 <html lang="en">
 <head>
@@ -13,31 +14,38 @@
 <title>Mockup B — month grid above the 7-day list</title>
 <link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="calendar.css">
+<style>
+  /* Page-level reset only. Everything inside .phone is styled by
+     calendar.css, which scopes the app's tokens to that element. */
+  html, body { margin: 0; padding: 0; background: #EEF1F5; }
+</style>
 </head>
 <body>
 
-<div class="mock-note">
-  <b>MOCKUP B — KEEP BOTH.</b> The month grid is the glance layer; the scrolling
-  7-day list you have now stays underneath. Tap a day and the list jumps to it,
-  then you keep scrolling forward through the following days.
-  <br><br>
-  Real ESPN games. It opens on <b>September</b> and treats Sep 13 as "today", because
-  the actual today (Jul 26) sits in the dead week between the World Cup final and the
-  NFL opener — an empty grid would tell you nothing. Use the arrows to see July and
-  August, which is what the quiet weeks really look like.
+<div class="phone">
+  <div class="mock-note">
+    <b>MOCKUP B — KEEP BOTH.</b> The month grid is the glance layer; the scrolling
+    7-day list you have now stays underneath. Tap a day and the list jumps to it,
+    then you keep scrolling forward through the following days.
+    <br><br>
+    Real ESPN games. It opens on <b>September</b> and treats Sep 13 as "today", because
+    the actual today (Jul 26) sits in the dead week between the World Cup final and the
+    NFL opener — an empty grid would tell you nothing. Use the arrows to see July and
+    August, which is what the quiet weeks really look like.
+  </div>
+
+  <header class="mock-mast">
+    <h1>Sports Master Schedule</h1>
+    <nav class="mock-tabs">
+      <span>Home</span><span class="on">Calendar</span><span>Playoffs</span><span>Tables</span>
+    </nav>
+  </header>
+
+  <main id="view"></main>
 </div>
 
-<header class="mock-mast">
-  <h1>Sports Master Schedule</h1>
-  <nav class="mock-tabs">
-    <span>Home</span><span class="on">Calendar</span><span>Playoffs</span><span>Tables</span>
-  </nav>
-</header>
-
-<main id="view"></main>
-
 <script src="data.js"></script>
-<script>var MODE = "both";</script>
 <script src="calendar.js"></script>
+<script>makeCalendar(document.getElementById("view"), "both");</script>
 </body>
 </html>

@@ -25,6 +25,8 @@
 <link rel="stylesheet" href="calendar.css">
 </head>
 <body>
+<style>html, body { margin: 0; padding: 0; background: #EEF1F5; }</style>
+<div class="phone">
 <header class="mock-mast">
   <h1>Sports Master Schedule</h1>
   <nav class="mock-tabs">
@@ -32,13 +34,15 @@
   </nav>
 </header>
 <main id="view"></main>
+</div>
 <pre id="probe-out"></pre>
 
 <script src="data.js"></script>
+<script src="calendar.js"></script>
 <script>
   var MODE = new URLSearchParams(location.search).get("mode") || "replace";
+  makeCalendar(document.getElementById("view"), MODE);
 </script>
-<script src="calendar.js"></script>
 <script>
 (function () {
     var fails = [], notes = [];

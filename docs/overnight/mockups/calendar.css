@@ -16,7 +16,11 @@
 
 /* ══ ZONE 1 — copied from static/style.css ═══════════════════════ */
 
-:root {
+/* Tokens live on .phone, NOT :root, so a page can host TWO of these
+   side by side (the review Artifact does exactly that) without the two
+   token sets fighting over the document root. The mockup pages wrap
+   their content in a single .phone and get the same result. */
+.phone {
   --page:       #EEF1F5;
   --page-2:     #E3E8EE;
   --surface:    #FFFFFF;
@@ -53,20 +57,24 @@
                  0 10px 24px -18px rgba(12, 21, 34, 0.28);
   --shadow-lift: 0 2px 4px rgba(12, 21, 34, 0.06),
                  0 16px 32px -18px rgba(12, 21, 34, 0.32);
-}
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-text-size-adjust: 100%; }
-body {
   font-family: var(--f-body);
   font-size: 15px;
   background: var(--page);
   color: var(--ink);
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  /* The app is a SINGLE LIGHT THEME by Dylan's Jul-15 ruling, so this
+     block never gets a dark variant -- even when the page around it
+     does. `color-scheme: light` stops a dark-mode browser from
+     auto-darkening form controls inside the specimen. */
+  color-scheme: light;
 }
-button { font-family: inherit; }
-.hidden { display: none !important; }
+.phone, .phone *, .phone *::before, .phone *::after {
+  box-sizing: border-box;
+}
+.phone * { margin: 0; padding: 0; }
+.phone button { font-family: inherit; }
 
 /* Section tag — the "lower third" device */
 .sec-tag {
