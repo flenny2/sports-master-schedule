@@ -4,8 +4,9 @@
 "keep SMS-1, discard SMS-2" — and the morning session executes exactly that. The
 KEEP / DISCARD column is yours; I leave it blank. IDs are never renumbered or reused.
 
-**Review board (the phone-friendly version of this file):** published as a private
-Artifact, rebuilt each pass from `docs/overnight/review-board.html`.
+**Review board (the phone-friendly version of this file):**
+<https://claude.ai/code/artifact/a1ac028b-0ea0-47bc-b52a-918e87ce2a65> — private,
+rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL is stable.
 **Branch:** `auto/overnight-sms-ux` · **Nothing is pushed. Nothing is merged.**
 **Suite:** 178 passed (`./tools/validate`), green at every commit on this branch.
 
