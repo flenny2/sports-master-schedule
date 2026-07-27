@@ -2,8 +2,8 @@
 
 what: Dylan's meta sports tracker / fan-experience hub — Front Page (marquee + slate + storylines + tables), calendar, playoffs, standings, and ON-DEMAND Claude tactical previews; Flask + vanilla HTML/CSS/JS, ESPN public API, in-memory cache, no DB and no build step
 rules: docs describe `master` only; NEVER `git push` (push = Render auto-deploy — shipping is Dylan's call); run `./tools/validate` before shipping; SINGLE LIGHT THEME — one `:root` token block, no dark mode, no toggle (Dylan Jul-15 ruling); preview generation is on-demand ONLY (spend = button press, never automatic)
-links: product truth `PRODUCT_BRIEF.md` (D1–D8, interview-converged Jul-17) · deploy config `render.yaml` (Render free tier) · idea/task inbox `TODOS.md` · cross-project style rulings `personal-style-tracker/`
-updated: 2026-07-22
+links: product truth `PRODUCT_BRIEF.md` (D1–D8, interview-converged Jul-17) · deploy config `render.yaml` (Render free tier) · idea/task inbox `TODOS.md` · overnight-lane law + phone-reviewable proposals `docs/overnight/` · cross-project style rulings `personal-style-tracker/`
+updated: 2026-07-26
 
 Dylan's fan hub — phone-first (deployed Render URL). Visual identity: **"broadcast graphics, in daylight"** — bright cool-white surfaces, near-monochrome ink chrome, ALL vivid color from teams/sports, ink "lower-third" section tags with a gold lead, and the signature **team-color duel seam** across each game card's top edge.
 
@@ -44,6 +44,7 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - **Tactical previews (brief D3)**: hybrid. Facts panel = free ESPN summary parse (`app/facts.py`). Read = `POST /preview` → `previews.mark_pending` → daemon thread (`app/tactical.py`) → Claude with server-side `web_search_20260209` (`max_uses=4` = cost cap), adaptive thinking, effort medium, `pause_turn` continuation (max 3) → sections stored in `data/previews.json` (`app/previews.py`, userdata pattern, gitignored, ephemeral-on-Render accepted). Background thread exists because gunicorn runs `--timeout 60`; the store is on disk so both workers see it. Output = plain text with `## ` section headings; `parse_sections` splits; frontend renders via `el()` (bullets + paragraphs, no markdown lib)
 - **Preview scope**: soccer + NFL only (`PREVIEW_SPORTS` in facts.py). Button on `pre` games; cached reads stay viewable after kickoff; "Refresh read" deliberately re-spends
 - **NFL pillar (brief D5)**: Steelers in `WATCHED_TEAMS` (id 23, must_watch) → `fetch_nfl_games` has THREE inclusion paths: watched team (slot "My Team", outranks Primetime label) / primetime / RedZone window. NFL standings = AFC/NFC conference tables with `playoffSeed` as rank (seed zones: 1 = bye, 2–7 playoff) — ESPN's v2 `level=3` division split returns empty entries, so conference view is the honest v1. `FANTASY_ROSTER` in config (name → NFL abbrev, hand-maintained post-draft) drives `app/fantasy.py` → `my_guys` on NFL games → dashed-gold "YOUR GUYS" chip
+- **Off-season "next up" lookahead (`app/lookahead.py`, Jul-26)**: the Front Page builds from one padded month, so between seasons that window can hold no future fixture at all and `findNextGame` returns nothing — which is how the Home page came to print a dead "No games in this window" line for weeks (padded July ends Aug 2; the next game was Aug 7). `/api/schedule` now scans forward `LOOKAHEAD_DAYS` (45) **only when its own window is exhausted** and returns that single game as `next_upcoming`; `static/app.js` uses it as the fallback for `buildNextUpCard`. Four things are deliberate: the module is **pure** (the ESPN fetch is injected, so it is pytest-reachable without a network stub — same pattern as `app/myteams.py`); the scan's result goes through the **same tagging chain** (`_tag_games`) because the card builder reads `tier`/`availability`; the helper returns **None when the loaded window still has a game**, so `next_upcoming` can never duplicate one already in `games`; and an ESPN failure inside the scan **degrades to None rather than raising** — a quiet front page is cosmetic, a 500 on the main endpoint is not
 - **Watched-row highlight is sport-scoped** in `fetch_standings` — ESPN team ids are only unique per sport (Steelers "23" ≠ NBA/soccer "23"); a flat set false-highlights other leagues
 - **Deep links**: `#front/#week/#playoffs/#tables` select a tab on load (tab clicks sync the hash); `#game-<espn id>` auto-expands that game's card — also how headless-Chrome screenshot verification reaches interactive states
 - **Importance tiers** (`app/importance.py`): must_watch / notable / major_event — all fetched NFL games are must_watch (every path implies it); soccer must-watch teams upgrade; NBA tier logic retained but dormant
@@ -51,7 +52,13 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - **Storylines** (`config.STORYLINES`) filter the Calendar and render as Front Page story cards; **TITLE_RACES** render as the Tables widget AND as richer Front Page race cards (gap headline via `buildGapString`). Front Page dedupes: a storyline whose games live in a league already covered by a race card is skipped
 - **Soccer fetch**: pass 1 per-team schedule (past games), pass 2 one date-range scoreboard call per league, pass 3 `FOLLOWED_COMPETITIONS` full-tournament follows (fifa.world). `CALENDAR_EXCLUDED_LEAGUES` hides ger.1/esp.1 from Calendar, standings unaffected
 - **Availability**: Mon–Fri 8am–6pm PT = will_miss, else can_watch
-- **Desktop vs mobile calendar**: desktop month grid + detail panel; mobile rolling 7-day window (arrows ±7 days). Mobile day blocks separated by a hairline; `appendGamesWithDayDivider` injects the "Coming Up" divider once per day
+- **Desktop vs mobile calendar (REVISED Jul-26 — Dylan chose "keep both")**: desktop = month grid + detail panel, unchanged. **Mobile = a month grid ON TOP of the rolling day list**, and tapping a grid day moves the list to start there — the grid is a glance layer that steers the feed, not a replacement for it. Consequences worth knowing before editing:
+  - **Nav arrows page MONTHS on both viewports now.** They used to shift a rolling 7-day window by ±7 days on mobile; a grid above them made that incoherent. `shiftMobileWindow`, `mobileWindowMidpointMonth` and `formatMobileWindowLabel` were deleted as orphans, and with them the documented month-boundary trade-off where 1–3 trailing days could render empty. Swipe piggybacks on the arrows, so a swipe is a month too
+  - **`mobileWindowDates()` is CLAMPED to the loaded padded range.** The grid can send the window to any day in the month, and an unclamped 7-day window would print "No games" for days nobody fetched. A short list ends with a "More in <next month>" button because the arrows are off-screen at that point
+  - **Day cells carry one dot per SPORT plus the game count — never one dot per game.** A ~49px cell (390px minus the 18px insets, ÷7) fits about four dots, and on a 14-game September Sunday the earliest four are all NFL, which silently hides the Premier League fixture that morning. Rejected and worth not re-attempting
+  - **"Played" is a hollow ring, not a faded dot.** Measured Jul-26: `--nfl` over white is 1.67:1 at 32% opacity and 2.54:1 at 55%, against 6.26:1 solid — no opacity that still reads as dimmed clears the palette's documented 3:1, and a shape difference also survives colour-blindness
+  - Grid columns are **Monday-first**, matching `DAY_NAMES` and the server's padded range (which always starts on a Monday)
+  - Mobile day blocks are still separated by a hairline; `appendGamesWithDayDivider` still injects the "Coming Up" divider once per day
 - **User data**: `data/userdata.json` + `data/previews.json` (both gitignored) via `DATA_DIR`-resolvable paths; ephemeral on Render free tier by design
 - **Interactive elements inside cards** (watched, notes, read buttons) must call `stopPropagation()` — the card body click toggles expand/collapse
 
@@ -81,6 +88,8 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - `config.py` — teams (soccer + Steelers), work schedule, title races, storylines, league exclusions, `FOLLOWED_COMPETITIONS`, `FANTASY_ROSTER`, NFL networks
 - `PRODUCT_BRIEF.md` — converged product decisions D1–D8; if code contradicts it, the brief wins or gets amended first
 - `tools/validate` — uniform validation entrypoint (pytest + `VALIDATE PASS`)
+- `tools/qa-phone-calendar.py` — phone QA against the RUNNING app at a true 390px (see Testing)
+- `docs/overnight/` — the overnight-lane law, the phone-reviewable proposal file, mockups and shots
 - `TODOS.md` — repo-native idea/task inbox
 - `app/espn.py` — ESPN client + cache; fetchers (incl. NFL 3-path), standings (incl. NFL), `fetch_first_leg`
 - `app/facts.py` — summary fetch + per-sport facts parsing (`PREVIEW_SPORTS`)
@@ -88,6 +97,7 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - `app/tactical.py` — prompt builder, Claude call (web search, cost caps), dry-run mode, background thread
 - `app/fantasy.py` — `my_guys` tagger from `FANTASY_ROSTER`
 - `app/myteams.py` — "Your Teams" strip assembly (pure helpers + `get_my_teams()`)
+- `app/lookahead.py` — next-fixture lookahead for the Front Page (pure; fetch injected)
 - `app/importance.py` · `app/availability.py` · `app/playoff.py` · `app/series_context.py` · `app/storylines.py` — game taggers
 - `app/routes.py` — all routes; tagging chain ends `tag_storylines` → `tag_my_guys`
 - `app/userdata.py` — watched/notes JSON store (defines the shared `_resolve_data_dir`)
@@ -96,9 +106,11 @@ Server on http://localhost:5000 with debug/auto-reload. Tactical reads run in **
 - `static/style.css` — the light design system: tokens, section tags, cards/seam, front page, calendar, tables, intel, responsive
 
 ## Testing
-Pytest suite in `tests/` — 167 tests: availability, importance, userdata, playoff tagging, series context, storylines, auth (incl. preview spend gate), ESPN parsing, NFL inclusion + standings mapping, fantasy tagger, facts parsing (fixtures from live-probed shapes), preview store + dry-run pipeline, schedule-route param edges, standings fragility, my-teams strip. Run `./tools/validate`.
+Pytest suite in `tests/` — 197 tests: availability, importance, userdata, playoff tagging, series context, storylines, auth (incl. preview spend gate), ESPN parsing, NFL inclusion + standings mapping, fantasy tagger, facts parsing (fixtures from live-probed shapes), preview store + dry-run pipeline, schedule-route param edges, standings fragility, my-teams strip, off-season lookahead (pure helpers + route wiring). Run `./tools/validate`.
 
 UI or live-ESPN work still needs a manual run: `python app.py`, browse, and screenshot (headless Chrome + `#hash` deep links reach every state, including expanded cards via `#game-<id>`).
+
+**Phone work must go through `tools/qa-phone-calendar.py`.** `google-chrome --headless --window-size=390,844` does **NOT** give a 390px viewport — Chrome clamps its window to a **500px minimum** on Linux (measured Jul-26, v150, both headless modes), so a phone pass driven that way silently measures 500px and reports green on a layout that clips at 390. The harness fixes both halves of the problem: it pins the app inside an iframe of the target width (iframes have no clamp) and proxies the app and the harness page through **one origin**, so the harness can read the app's real DOM and click its real controls. It asserts `innerWidth` itself, so the trap cannot come back unnoticed. Same trick, without the app, in `tools/shoot-mockups.py` + `docs/overnight/mockups/frame.html`.
 
 ## Known TODOs / deferred features
 - **Deferred by the revamp interview (brief §D8)**: milestone watch (needs a curated chase list from Dylan) · NBA tactical previews · NFL draft/offseason tracker · ESPN-fantasy roster auto-pull · MLB/NHL. ~~your-teams strip~~ BUILT Jul-22 (brief amendment A2)

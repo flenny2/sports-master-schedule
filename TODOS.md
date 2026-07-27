@@ -1,7 +1,7 @@
 # TODOS — sports-master-schedule inbox
 
 what: repo-native idea/task inbox (capture-ritual target); sessions sweep + prune, replace-semantics
-updated: 2026-07-22 (§myteams + §preseason-zeros SHIPPED LIVE; §mobile-month-calendar captured for next session)
+updated: 2026-07-26 (§mobile-month-calendar BUILT + §offseason-next-up FIXED — both merged to master, un-pushed; overnight-lane law + proposals live in docs/overnight/)
 
 ## §revamp — BUILT 2026-07-18 on `ws/revamp-v1` (brief: PRODUCT_BRIEF.md)
 
@@ -24,37 +24,53 @@ Front Page marquee the moment it deploys.
   needs a curated chase list from Dylan) · NBA previews · draft/offseason tracker ·
   ESPN-fantasy auto-pull · NFC mini table on Home (AFC ships; NFC lives on Tables)
 
-## §mobile-month-calendar — NEXT SESSION (Dylan, 2026-07-22, after seeing the strip ship)
+## §mobile-month-calendar — BUILT 2026-07-26, MERGED to master, awaiting Dylan's push
 
-**His words:** *"I just want the calendar to look like an actual calendar, like the full
-month version so i can see the next few weeks at a glance."* Explicitly deferred to the
-next session — nothing started.
+**His words were:** *"I just want the calendar to look like an actual calendar, like the
+full month version so i can see the next few weeks at a glance."* The fork this TODO
+flagged — replace the rolling 7-day list, or keep it under a month grid — was a TASTE
+call, so the overnight lane built BOTH as inert mockups and **Dylan chose B: keep both**
+(2026-07-26). Then built it for real.
 
-**What exists today.** `renderCalendar()` (`static/app.js:1080`) forks on `isMobile()`
-(`MOBILE_BP = 640`, line 35): desktop gets `renderDesktopCalendar()` (line 1101, a real
-month grid + a `renderDetail()` side panel at 1237); **mobile gets
-`renderMobileCalendar()` (line 1187), a rolling 7-DAY LIST**, not a grid. That's the
-thing he's asking to replace. The 7-day window is a whole subsystem, not one function:
-`mobileWindowStart` state · `mobileWindowDates()` 162 · `mobileWindowMidpointMonth()` 178
-· `initMobileWindowIfNeeded()` 188 · `shiftMobileWindow(days)` 198 ·
-`formatMobileWindowLabel()` 219, plus a branch in `render()` that re-fetches when the
-window slides into a new month, and the `btnPrev`/`btnNext` arrows which mean ±7 days on
-mobile but ±1 month on desktop.
+- [x] Two mockups under `docs/overnight/mockups/` (proposal SMS-1) — standalone pages that
+      never import from `static/`, so the fork cost nothing to review
+- [x] Option B in the app (SMS-3, `6e604ee`): month grid above the day list on mobile;
+      tapping a day moves the list to start there
+- [x] Mobile arrows now page **months**, not ±7 days — they have to agree with the grid.
+      That orphaned `shiftMobileWindow`, `mobileWindowMidpointMonth` and
+      `formatMobileWindowLabel`; all three deleted rather than left dead. The documented
+      month-boundary trade-off (1–3 trailing days rendering empty) is retired with them
+- [x] `mobileWindowDates()` clamped to the loaded padded range, plus a "More in <month>"
+      button when the list comes up short — an unclamped window would print "No games" for
+      days nobody fetched
+- [x] `tools/qa-phone-calendar.py` — proxies the app + harness through one origin so the
+      running app can be pinned to a **true 390px** and measured into. **Headless Chrome
+      will not give a viewport under 500px on Linux**, which silently widened a whole first
+      pass; the harness asserts `innerWidth` so that cannot recur
+- [ ] **Dylan**: `git push origin master` — merged locally (`f33309b`), NOT deployed
 
-**The real design problem** (why this is a Fable-class job, not a one-liner): a 7-column
-month grid on a 390px phone gives ~50px cells. Game cards don't fit. So the mobile grid
-needs a compact day cell — probably sport-colored dots or a count — plus a tap target
-that opens that day's games, since mobile has no room for the desktop detail panel (a
-bottom sheet, or an expanding row beneath the tapped week). Decide that interaction
-BEFORE writing the grid.
+**Design notes worth keeping.** Day cells are ~49px on a 390px phone, so they carry a
+date, one dot per SPORT, and the game count — *not* one dot per game, because on a 14-game
+Sunday the first few dots are all NFL and the Premier League fixture that morning
+disappears. "Played" is a hollow ring rather than a faded dot: no opacity that still reads
+as dimmed clears the palette's documented 3:1 (measured — `--nfl` over white is 1.67:1 at
+32%, 2.54:1 at 55%, against 6.26:1 solid), and a shape difference survives colour-blindness.
+Grid columns are Monday-first, matching `DAY_NAMES` and the server's padded range.
 
-**Worth confirming with Dylan first:** does he want the 7-day list *replaced*, or kept as
-a secondary view under the month grid? "See the next few weeks at a glance" could mean a
-true month grid, or a 2–3 week rolling grid anchored on today — the latter is arguably
-closer to what he said and is easier to fit on a phone.
+## §offseason-next-up — FIXED 2026-07-26, MERGED to master, awaiting Dylan's push
 
-**Fences unchanged:** branch-only, `./tools/validate` green, single light theme, and
-`git push` is HARD-DENIED in `.claude/settings.json` — Dylan must run the push himself.
+Found by screenshotting the running app at 390px (proposal SMS-2, `fd10a53`). The Home
+page's Today's Slate showed *"No games in this window — browse the calendar."* — the
+last-resort branch, which should have been unreachable because `buildNextUpCard` already
+exists for exactly this case. `findNextGame()` only ever searched the loaded padded month;
+the padded July range ends Aug 2 and the next fixture was Aug 7, five days out of reach.
+
+`/api/schedule` now scans forward 45 days **only when its own window has no upcoming
+fixture left** and returns that one game as `next_upcoming` (new `app/lookahead.py`, pure,
+19 tests, ESPN fetch injected). The scan result goes through the same tagging chain, so the
+front page renders it with the ordinary card builder. An ESPN failure inside the scan
+degrades to the old message rather than raising — a quiet front page is cosmetic, a 500 on
+the main endpoint is not.
 
 ## §myteams — "Your Teams" strip BUILT 2026-07-22 on `ws/myteams-strip`
 
