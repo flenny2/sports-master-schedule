@@ -187,6 +187,15 @@ BOARD_CSS = """
   font-size: 0.97rem;
 }
 .rec b { color: var(--gold-tx); }
+.rec .cmd {
+  display: block;
+  padding: 11px 13px;
+  border-radius: 6px;
+  background: var(--desk-3);
+  font-family: var(--f-mono);
+  font-size: 0.86rem;
+  overflow-x: auto;
+}
 
 /* Segmented A/B control. Hidden once both specimens fit side by side. */
 .switch {
@@ -367,12 +376,15 @@ BOARD_HTML = """
     </div>
 
     <div class="rec">
-      <b>Now: three things to keep or discard.</b> SMS-1 is the mockups — pure documents,
-      keeping or discarding them changes nothing a user sees. <b>SMS-2 and SMS-3 are live
-      code</b>, so keeping either means a deploy later, by your hand. My recommendation is
-      keep all three: SMS-3 is the thing you asked for, SMS-2 removes a dead line the front
-      page shows every day until August 7, and SMS-1 is the record of why SMS-3 looks the
-      way it does.
+      <b>All three kept</b> — your word, 26 July — and merged onto <code>master</code> as
+      <code>f33309b</code>. 197 tests green, verified against the running app at a real
+      390px viewport. <b>Nothing is deployed.</b> One command from you does that:
+      <br><br>
+      <code class="cmd">git push origin master</code>
+      <br>
+      Kept, for the record: SMS-3 is the calendar you chose, SMS-2 removes the dead line
+      the front page shows every day until 7 August, and SMS-1 is the pair of mockups that
+      record why SMS-3 looks the way it does.
     </div>
   </section>
 
@@ -477,7 +489,7 @@ BOARD_HTML = """
           seven days and offers a "More in August" button rather than pretending those days
           are empty. Live code: keeping it means a deploy.
         </dd></div>
-        <div class="verdict"><dt>Keep / discard</dt><dd>yours</dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>KEPT</dd></div>
       </dl>
     </article>
 
@@ -508,7 +520,7 @@ BOARD_HTML = """
           rewiring the seven-day window code, which is a real change to a page you use, on
           a repo where shipping is a deploy.
         </dd></div>
-        <div class="verdict"><dt>Keep / discard</dt><dd>yours — you chose B; SMS-3 is that, built</dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>KEPT — you chose B; SMS-3 is that, built</dd></div>
       </dl>
     </article>
 
@@ -559,7 +571,7 @@ BOARD_HTML = """
           the right trade, but it makes the failure invisible. A gap longer than 45 days
           would still show the old line.
         </dd></div>
-        <div class="verdict"><dt>Keep / discard</dt><dd>yours</dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>KEPT</dd></div>
       </dl>
     </article>
   </section>
@@ -579,7 +591,7 @@ BOARD_HTML = """
   </section>
 
   <footer class="foot">
-    <b>Branch</b> auto/overnight-sms-ux · nothing merged, nothing pushed<br>
+    <b>Branch</b> auto/overnight-sms-ux · merged to master (f33309b) · <b>not pushed</b><br>
     <b>Deploy</b> untouched — pushing this repo is a deploy and only ever your hand<br>
     <b>Tests</b> 197 passing (./tools/validate)<br>
     <b>Measured</b> at a true 390px viewport, both layouts, all geometry checks green<br>
