@@ -21,6 +21,11 @@ var currentSport = "all";
 var selectedDate = null;
 var allGames     = [];
 var rangeInfo    = null;     // { start: "YYYY-MM-DD", end: "YYYY-MM-DD" }
+// The next fixture BEYOND the loaded window, supplied by /api/schedule
+// only when that window has none left of its own. Between seasons the
+// padded month can run out before the next game exists, and without
+// this the Front Page falls through to "No games in this window".
+var nextBeyondWindow = null;
 var standingsData = [];
 var standingsLoaded = false;
 var titleRacesData = [];
@@ -439,6 +444,7 @@ function loadSchedule(refresh) {
     }).then(function(data) {
         allGames = data.games || [];
         rangeInfo = data.range;
+        nextBeyondWindow = data.next_upcoming || null;
         updateNav();
         hide(statusMsg);
 
@@ -552,7 +558,7 @@ function renderFrontPage(games) {
     var list = el("div", "fp-slate-list");
 
     if (todayGames.length === 0) {
-        var nxt = findNextGame(games);
+        var nxt = findNextGame(games) || nextBeyondWindow;
         if (nxt) {
             list.appendChild(buildNextUpCard(nxt));
         } else {
