@@ -434,16 +434,28 @@
   min-height: 7px;
   flex-wrap: nowrap;
 }
+/* Played vs still-to-come is a SHAPE difference, not a faded one.
+   Fading the dot was the first attempt and it failed twice over: at 5px
+   a 32%-opacity mark is nearly invisible on a white cell, and no opacity
+   that still reads as "dimmed" can clear the 3:1 contrast this palette
+   is documented as meeting (--nfl at 55% over white measures ~2.5:1).
+   A hollow ring keeps the sport colour at full strength, reads at a
+   glance, and survives colour-blindness — which an opacity step does
+   not. Dots go to 6px so the 1.5px ring has room. */
 .mg-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
+  background: currentColor;
 }
-.mg-dot.soccer     { background: var(--soccer); }
-.mg-dot.football   { background: var(--nfl); }
-.mg-dot.basketball { background: var(--nba); }
-.mg-dot.dimmed     { opacity: 0.32; }
+.mg-dot.soccer     { color: var(--soccer); }
+.mg-dot.football   { color: var(--nfl); }
+.mg-dot.basketball { color: var(--nba); }
+.mg-dot.dimmed {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
 /* The game count. Deliberately a touch larger than the first draft
    (0.54rem): once the dots stopped counting games and started naming
    sports, this number became the "how busy is that day" signal and

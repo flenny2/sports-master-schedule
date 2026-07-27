@@ -42,7 +42,11 @@ var START_MONTH = "2026-09";
    the Artifact identical whatever timezone the reviewing phone is in. */
 var TZ = "America/Los_Angeles";
 
-var DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/* MONDAY-first. The padded range /api/schedule returns always starts
+   on a Monday, so a Sunday-first header row mislabels every column
+   by one day -- which is exactly what the first version of this
+   mockup did (caught while porting it, Jul-26). */
+var DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 var SPORT_SEAM = {
     soccer:     ["#0E7C3A", "#075E2C"],
     basketball: ["#E25A00", "#A84300"],
