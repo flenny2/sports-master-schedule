@@ -93,3 +93,12 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   endpoint returned a game the caller already had, duplicating it); tightened so the new
   field can only ever mean "a fixture your window does not contain", with a test pinning
   that the key is absent in the ordinary case. 178 → 197 tests.
+
+- **PAUSED at a clean cycle boundary, 2026-07-26 evening.** Not a STOPPING line — the queue
+  is not empty and the lane can resume at idea 3 (phone chrome pass) whenever it is picked
+  up. Paused rather than continued because SMS-1 is a question only Dylan can answer, and
+  cycle 3 would stack a third undecided change on top of it.
+- **One cross-repo item owed, needs Dylan's word:** the "headless Chrome clamps its window
+  to 500px" finding belongs in the `headless-qa` skill (its own rule 8 says so), but that
+  file lives under `~/.claude/`, which no session edits without him. Banked meanwhile in
+  the repo memory `sms-session-gotchas`.
