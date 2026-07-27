@@ -21,6 +21,11 @@ var currentSport = "all";
 var selectedDate = null;
 var allGames     = [];
 var rangeInfo    = null;     // { start: "YYYY-MM-DD", end: "YYYY-MM-DD" }
+// The next fixture BEYOND the loaded window, supplied by /api/schedule
+// only when that window has none left of its own. Between seasons the
+// padded month can run out before the next game exists, and without
+// this the Front Page falls through to "No games in this window".
+var nextBeyondWindow = null;
 var standingsData = [];
 var standingsLoaded = false;
 var titleRacesData = [];
@@ -158,85 +163,58 @@ function rangeDates() {
     return out;
 }
 
-/** Seven date strings starting at mobileWindowStart (mobile view) */
+/** The days the mobile list shows: up to 7 starting at
+ *  mobileWindowStart, clamped to the loaded month's padded range.
+ *
+ *  Clamping matters now that the month grid above the list can send the
+ *  window to any day in the month (Dylan chose option B, Jul-26). Tap
+ *  the last Thursday and an unclamped window would run past the range
+ *  the server sent, printing "No games" for days nobody has fetched —
+ *  a confident lie. Short is honest; the › arrow goes further. */
 function mobileWindowDates() {
     if (!mobileWindowStart) return [];
     var dates = [];
     var d = new Date(mobileWindowStart + "T12:00:00");
     for (var i = 0; i < 7; i++) {
-        dates.push(d.toLocaleDateString("en-CA"));
+        var key = d.toLocaleDateString("en-CA");
+        if (rangeInfo && key > rangeInfo.end) break;
+        dates.push(key);
         d.setDate(d.getDate() + 1);
     }
     return dates;
 }
 
-/** Month that contains the window's midpoint (day 4 of 7) — this is
- *  the month we fetch so a single padded month fetch covers the window.
- *  In rare month-boundary cases (month ends Sun → Mon), 1–3 trailing
- *  days may render empty until the next arrow click shifts the midpoint
- *  into the new month. Accepted trade-off per project spec. */
-function mobileWindowMidpointMonth() {
-    var d = new Date(mobileWindowStart + "T12:00:00");
-    d.setDate(d.getDate() + 3);
-    return { year: d.getFullYear(), month: d.getMonth() + 1 };
-}
-
-/** Lazy init of the mobile window state. Runs on first mobile render
- *  and on resize from desktop → mobile when state hasn't been set.
- *  Returns true if currentYear/currentMonth shifted (caller may need
- *  to refetch). */
+/** Anchor the mobile list's start day when it has none.
+ *
+ *  Runs at boot and again after every month change (the arrows clear
+ *  mobileWindowStart so this re-anchors against the newly loaded
+ *  range). Prefers today when the loaded month contains it, so opening
+ *  the app lands on now; otherwise the first day of the range, so
+ *  paging to another month starts at its top rather than on a date
+ *  that month does not contain.
+ *
+ *  Returns false always — kept as a boolean because render() branches
+ *  on it. Under the old rolling-7-day design this could shift
+ *  currentMonth and force a refetch; the month is now chosen directly
+ *  by the arrows, so there is nothing left to correct. */
 function initMobileWindowIfNeeded() {
     if (mobileWindowStart) return false;
-    mobileWindowStart = todayStr();
-    var mid = mobileWindowMidpointMonth();
-    var changed = mid.year !== currentYear || mid.month !== currentMonth;
-    currentYear = mid.year;
-    currentMonth = mid.month;
-    return changed;
-}
-
-function shiftMobileWindow(days) {
-    var d = new Date(mobileWindowStart + "T12:00:00");
-    d.setDate(d.getDate() + days);
-    mobileWindowStart = d.toLocaleDateString("en-CA");
-
-    var mid = mobileWindowMidpointMonth();
-    if (mid.year !== currentYear || mid.month !== currentMonth) {
-        // Window's midpoint crossed into a different month — refetch
-        currentYear = mid.year;
-        currentMonth = mid.month;
-        loadSchedule();
+    var today = todayStr();
+    if (rangeInfo && (today < rangeInfo.start || today > rangeInfo.end)) {
+        mobileWindowStart = rangeInfo.start;
     } else {
-        updateNav();
-        render();
+        mobileWindowStart = today;
     }
+    return false;
 }
 
-/** Format for the nav label on mobile:
- *    same month:   "Apr 23 – 29"
- *    crosses mo:   "Apr 27 – May 3"
- *    crosses yr:   "Dec 30 – Jan 5, 2027" */
-function formatMobileWindowLabel() {
-    var start = new Date(mobileWindowStart + "T12:00:00");
-    var end = new Date(start);
-    end.setDate(end.getDate() + 6);
-    var sameMonth = start.getMonth() === end.getMonth() &&
-                    start.getFullYear() === end.getFullYear();
-    var sameYear = start.getFullYear() === end.getFullYear();
-    var mShort = function(d) {
-        return d.toLocaleDateString("en-US", { month: "short" });
-    };
-    if (sameMonth) {
-        return mShort(start) + " " + start.getDate() +
-               " – " + end.getDate();
-    }
-    if (sameYear) {
-        return mShort(start) + " " + start.getDate() +
-               " – " + mShort(end) + " " + end.getDate();
-    }
-    return mShort(start) + " " + start.getDate() +
-           " – " + mShort(end) + " " + end.getDate() +
-           ", " + end.getFullYear();
+/** Move the mobile list to a day the user tapped in the month grid.
+ *  No refetch — the grid only ever offers days inside the loaded
+ *  range. */
+function setMobileWindowStart(dateKey) {
+    mobileWindowStart = dateKey;
+    selectedDate = dateKey;
+    render();
 }
 
 /** Look up a team's standings position from pre-fetched data */
@@ -300,29 +278,26 @@ var DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // ── Events ───────────────────────────────────────────────────────
 
-// Nav arrows: mobile shifts the 7-day window by ±7 days; desktop
-// navigates whole months. Swipe-to-nav piggybacks on these clicks.
-btnPrev.addEventListener("click", function() {
-    if (isMobile()) {
-        shiftMobileWindow(-7);
-    } else {
-        currentMonth--;
-        if (currentMonth < 1) { currentMonth = 12; currentYear--; }
-        selectedDate = null;
-        loadSchedule();
-    }
-});
+// Nav arrows page whole months on BOTH viewports. Mobile used to shift
+// a rolling 7-day window by ±7 days instead, which is why the label
+// read "Apr 23 – 29" there; now that a month grid sits above the list
+// (Dylan's option B, Jul-26) the arrows have to agree with the grid, and
+// picking a day inside the month is the grid's job. Swipe-to-nav
+// piggybacks on these clicks, so a swipe is a month too.
+function stepMonth(delta) {
+    currentMonth += delta;
+    if (currentMonth < 1)  { currentMonth = 12; currentYear--; }
+    if (currentMonth > 12) { currentMonth = 1;  currentYear++; }
+    selectedDate = null;
+    // Cleared so initMobileWindowIfNeeded() re-anchors the list against
+    // the month that is about to load, rather than leaving it pointing
+    // at a day in the month we just left.
+    mobileWindowStart = null;
+    loadSchedule();
+}
 
-btnNext.addEventListener("click", function() {
-    if (isMobile()) {
-        shiftMobileWindow(+7);
-    } else {
-        currentMonth++;
-        if (currentMonth > 12) { currentMonth = 1; currentYear++; }
-        selectedDate = null;
-        loadSchedule();
-    }
-});
+btnPrev.addEventListener("click", function() { stepMonth(-1); });
+btnNext.addEventListener("click", function() { stepMonth(1); });
 
 btnRefresh.addEventListener("click", function() { loadSchedule(true); });
 
@@ -439,6 +414,7 @@ function loadSchedule(refresh) {
     }).then(function(data) {
         allGames = data.games || [];
         rangeInfo = data.range;
+        nextBeyondWindow = data.next_upcoming || null;
         updateNav();
         hide(statusMsg);
 
@@ -552,7 +528,7 @@ function renderFrontPage(games) {
     var list = el("div", "fp-slate-list");
 
     if (todayGames.length === 0) {
-        var nxt = findNextGame(games);
+        var nxt = findNextGame(games) || nextBeyondWindow;
         if (nxt) {
             list.appendChild(buildNextUpCard(nxt));
         } else {
@@ -1005,11 +981,10 @@ function loadStandings() {
 }
 
 function updateNav() {
-    if (isMobile() && mobileWindowStart) {
-        monthLabel.textContent = formatMobileWindowLabel();
-    } else {
-        monthLabel.textContent = MONTH_NAMES[currentMonth] + " " + currentYear;
-    }
+    // One label on both viewports: the arrows page months everywhere, so
+    // a date-range label on mobile would describe something the arrows
+    // no longer move.
+    monthLabel.textContent = MONTH_NAMES[currentMonth] + " " + currentYear;
     btnPrev.disabled = false;
     btnNext.disabled = false;
 }
@@ -1183,15 +1158,122 @@ function renderDesktopCalendar(games) {
     renderDetail(games);
 }
 
-/** Mobile: 2-week vertical list with game cards inline */
+/** A day cell's marks: one dot per SPORT on that day, then the game
+ *  count when there is more than one.
+ *
+ *  Not one dot per game. A ~49px cell fits about four dots, and on a
+ *  September Sunday with fourteen games the first four are all NFL —
+ *  which silently hides that there is also a Premier League fixture
+ *  that morning. A glance layer that hides a whole sport is worse than
+ *  no glance layer, so the dots name sports and a number carries
+ *  volume. (Measured while mocking this up, Jul-26.) */
+function buildDayMarks(dayGames) {
+    var marks = el("div", "mg-dots");
+    var sports = [];
+    dayGames.forEach(function(g) {
+        if (sports.indexOf(g.sport) === -1) sports.push(g.sport);
+    });
+    sports.forEach(function(sp) {
+        var dot = el("span", "mg-dot " + sp);
+        // Dim a sport only once every one of ITS games that day is
+        // finished, so a half-played day still reads as live.
+        var allDone = dayGames.every(function(g) {
+            return g.sport !== sp || g.status === "post";
+        });
+        if (allDone) dot.classList.add("dimmed");
+        marks.appendChild(dot);
+    });
+    if (dayGames.length > 1) {
+        marks.appendChild(el("span", "mg-more", String(dayGames.length)));
+    }
+    return marks;
+}
+
+/** Mobile month grid — the glance layer above the day list.
+ *
+ *  Sized for a 390px phone: minus the 18px page inset that leaves 354px,
+ *  so a 7-column cell is about 49px and can hold a date, a few dots and
+ *  a count. Nothing larger fits, which is why tapping a day is how you
+ *  find out who is playing. Columns are MONDAY-first to match
+ *  DAY_NAMES, the desktop grid, and the padded range the server sends
+ *  (which always starts on a Monday). */
+function buildMobileMonthGrid(games) {
+    var grid = el("div", "month-grid");
+    var gbd = groupByDay(games);
+    var today = todayStr();
+
+    DAY_NAMES.forEach(function(name) {
+        grid.appendChild(el("div", "mg-dow", name));
+    });
+
+    rangeDates().forEach(function(dk) {
+        var dg = gbd[dk] || [];
+        var dateObj = new Date(dk + "T12:00:00");
+        var cell = el("button", "mg-cell");
+        cell.type = "button";
+        if (dateObj.getMonth() + 1 !== currentMonth) cell.classList.add("outside");
+        if (dk === today) cell.classList.add("is-today");
+        if (dk === mobileWindowStart) cell.classList.add("selected");
+        cell.setAttribute("aria-label",
+            dateObj.toLocaleDateString("en-US",
+                { weekday: "long", month: "long", day: "numeric" }) +
+            ", " + dg.length + (dg.length === 1 ? " game" : " games"));
+
+        cell.appendChild(el("div", "mg-num", String(dateObj.getDate())));
+        cell.appendChild(buildDayMarks(dg));
+        cell.addEventListener("click", function() {
+            setMobileWindowStart(dk);
+        });
+        grid.appendChild(cell);
+    });
+
+    return grid;
+}
+
+/** Legend for the grid. The count especially needs one — it is the
+ *  busiest signal up there and reads as an unexplained number. */
+function buildMobileGridLegend() {
+    var wrap = el("div", "mg-legend");
+    [["football", "NFL"], ["soccer", "Soccer"]].forEach(function(pair) {
+        var item = el("span");
+        item.appendChild(el("i", "mg-dot " + pair[0]));
+        item.appendChild(document.createTextNode(pair[1]));
+        wrap.appendChild(item);
+    });
+    var played = el("span");
+    played.appendChild(el("i", "mg-dot football dimmed"));
+    played.appendChild(document.createTextNode("Played"));
+    wrap.appendChild(played);
+
+    var count = el("span");
+    count.appendChild(el("b", "mg-legend-num", "14"));
+    count.appendChild(document.createTextNode("Games"));
+    wrap.appendChild(count);
+    return wrap;
+}
+
+/** Mobile: month grid, then the day list it steers.
+ *
+ *  Dylan's option B (Jul-26): the grid is the "next few weeks at a
+ *  glance" layer and the scrolling list stays underneath, so tapping a
+ *  day moves the list to start there instead of opening a panel. */
 function renderMobileCalendar(games) {
     clear(calGrid);
     hide(detPanel);
     calGrid.className = "mobile-calendar";
 
+    calGrid.appendChild(buildMobileMonthGrid(games));
+    calGrid.appendChild(buildMobileGridLegend());
+
     var dates = mobileWindowDates();
     var gbd = groupByDay(games);
     var today = todayStr();
+
+    // The list needs a name once a grid sits above it, or its first day
+    // header reads as part of the grid.
+    var tagRow = el("div", "list-tag-row");
+    tagRow.appendChild(el("span", "sec-tag", "Coming Up"));
+    calGrid.appendChild(tagRow);
 
     dates.forEach(function(dk) {
         var dg = gbd[dk] || [];
@@ -1228,6 +1310,18 @@ function renderMobileCalendar(games) {
 
         calGrid.appendChild(day);
     });
+
+    // The list is clamped to the loaded range, so tapping a day late in
+    // the month can leave fewer than seven. Say where the rest is rather
+    // than just stopping — the arrows are the only way forward and they
+    // are back up at the top of the screen.
+    if (dates.length < 7) {
+        var nextName = MONTH_NAMES[currentMonth === 12 ? 1 : currentMonth + 1];
+        var more = el("button", "mobile-more", "More in " + nextName + " \u203a");
+        more.type = "button";
+        more.addEventListener("click", function() { btnNext.click(); });
+        calGrid.appendChild(more);
+    }
 }
 
 // ═════════════════════════════════════════════════════════════════

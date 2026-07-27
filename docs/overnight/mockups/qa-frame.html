@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<!--
+  QA-FRAME — measures the REAL app at a true phone width.
+
+  Two problems this solves at once:
+
+  1. `google-chrome --headless --window-size=390,844` does not give a
+     390px viewport. Chrome clamps its window to a 500px minimum on
+     Linux, so a phone pass driven that way silently measures 500px and
+     reports green on a layout that clips at 390. An iframe has no such
+     clamp, so the app inside really does lay out at 390.
+
+  2. Reading into that iframe needs SAME ORIGIN. tools/qa-phone-calendar.py
+     serves this file and proxies everything else to the Flask app, so
+     this page and the app share one origin and the asserts below can
+     touch the app's real DOM and click its real controls.
+
+  Usage: qa-frame.html?w=390&src=/#week  (see the driver)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>qa-frame</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #B8C0CC; }
+  #stage { width: max-content; margin: 0 auto; background: #EEF1F5; }
+  iframe { display: block; border: 0; }
+  pre { font: 12px monospace; padding: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="stage"><iframe id="f" title="app under test"></iframe></div>
+<pre id="qa-out">running…</pre>
+
+<script>
+(function () {
+    var q = new URLSearchParams(location.search);
+    var W = parseInt(q.get("w") || "390", 10);
+    var SRC = q.get("src") || "/#week";
+
+    var out = document.getElementById("qa-out");
+    var f = document.getElementById("f");
+    f.style.width = W + "px";
+    f.style.height = "844px";
+
+    var fails = [], notes = [];
+    function check(name, ok, detail) {
+        (ok ? notes : fails).push((ok ? "PASS  " : "FAIL  ") + name + " — " + detail);
+    }
+
+    function finish() {
+        out.textContent = fails.concat(notes).join("\n") + "\n" +
+            (fails.length ? "RESULT: " + fails.length + " FAILED" : "RESULT: ALL PASS");
+        document.title = fails.length ? "QA FAIL" : "QA PASS";
+    }
+
+    /* The app fetches its schedule before it can draw anything, so poll
+       for the grid rather than assuming a fixed settle time. A DOM probe
+       beats a guessed delay (headless-qa rule 1). */
+    function waitFor(doc, sel, deadline, done) {
+        if (doc.querySelector(sel)) return done(true);
+        if (Date.now() > deadline) return done(false);
+        setTimeout(function () { waitFor(doc, sel, deadline, done); }, 100);
+    }
+
+    f.addEventListener("load", function () {
+        var doc = f.contentDocument;
+        var win = f.contentWindow;
+
+        waitFor(doc, ".month-grid", Date.now() + 20000, function (ready) {
+            check("app rendered a month grid within 20s", ready,
+                  ready ? "found" : "timed out — is the app serving data?");
+            if (!ready) return finish();
+
+            check("viewport really is " + W + "px", win.innerWidth === W,
+                  "innerWidth " + win.innerWidth);
+
+            var cells = doc.querySelectorAll(".mg-cell");
+            check("grid has a full month of cells", cells.length >= 28,
+                  cells.length + " cells");
+
+            check("no horizontal overflow",
+                  doc.documentElement.scrollWidth <= win.innerWidth + 1,
+                  "scrollWidth " + doc.documentElement.scrollWidth +
+                  " vs viewport " + win.innerWidth);
+
+            /* Monday-first. The padded range the server sends always
+               starts on a Monday, so a Sunday-first header row mislabels
+               every column by one day — which the first mockup did. */
+            var dow = doc.querySelectorAll(".mg-dow");
+            check("weekday headers start on Monday",
+                  dow.length === 7 &&
+                  dow[0].textContent.trim().toLowerCase() === "mon",
+                  Array.prototype.map.call(dow, function (d) {
+                      return d.textContent.trim();
+                  }).join(" "));
+
+            var minH = Infinity, minW = Infinity;
+            cells.forEach(function (c) {
+                var r = c.getBoundingClientRect();
+                if (r.height < minH) minH = r.height;
+                if (r.width < minW) minW = r.width;
+            });
+            check("cell height clears the 44px tap target", minH >= 44,
+                  "smallest cell " + minW.toFixed(1) + " x " + minH.toFixed(1));
+
+            /* Measure each MARK, not the row that holds them: the row is
+               a nowrap flex container, so it stays inside the cell while
+               its children spill. That exact mistake passed green on a
+               visibly clipped "+10" earlier today. */
+            var spill = 0, worst = "";
+            cells.forEach(function (c) {
+                var cr = c.getBoundingClientRect();
+                c.querySelectorAll(".mg-dots > *").forEach(function (kid) {
+                    var kr = kid.getBoundingClientRect();
+                    if (kr.left < cr.left - 0.5 || kr.right > cr.right + 0.5) {
+                        spill++;
+                        worst = c.getAttribute("aria-label");
+                    }
+                });
+            });
+            check("day marks stay inside their cell", spill === 0,
+                  spill === 0 ? "0 across " + cells.length + " cells"
+                              : spill + " spill, e.g. " + worst);
+
+            /* Option B: the grid ADDS a layer, it does not replace the
+               list. Both must be on screen. */
+            var days = doc.querySelectorAll(".mobile-day");
+            check("the rolling day list is still there", days.length > 0,
+                  days.length + " day blocks below the grid");
+
+            /* And the grid must steer it. Pick a cell that is not the
+               current selection, click it, and the list's first day has
+               to be that date. */
+            var target = null;
+            cells.forEach(function (c) {
+                if (!target && !c.classList.contains("selected") &&
+                    !c.classList.contains("outside")) target = c;
+            });
+            if (!target) {
+                check("tapping a day moves the list", false, "no tappable cell found");
+                return finish();
+            }
+            var wantDay = target.getAttribute("aria-label").split(",")[1].trim();
+            target.click();
+
+            setTimeout(function () {
+                var first = doc.querySelector(".mobile-day-name");
+                var got = first ? first.textContent.trim() : "(none)";
+                /* Case-tolerant: these headers are text-transform:
+                   uppercase, so innerText lies about their case. */
+                var wantShort = wantDay.replace(/^(\w{3})\w*/, "$1").toLowerCase();
+                check("tapping a day moves the list to that day",
+                      got.toLowerCase().indexOf(wantShort) !== -1,
+                      "tapped " + wantDay + ", list starts \"" + got + "\"");
+                finish();
+            }, 400);
+        });
+    });
+
+    f.src = SRC;
+})();
+</script>
+</body>
+</html>

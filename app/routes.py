@@ -4,7 +4,7 @@ Flask routes — serves the dashboard page and the schedule API.
 
 import calendar
 import os
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from flask import (
     Blueprint, render_template, jsonify, request, make_response,
 )
@@ -13,6 +13,7 @@ from app.espn import get_all_games, get_all_standings, get_title_races, clear_ca
 from app.facts import PREVIEW_SPORTS, get_game_facts
 from app.fantasy import tag_my_guys
 from app.importance import tag_importance
+from app.lookahead import next_game_beyond_window
 from app.myteams import get_my_teams
 from app.availability import tag_availability
 from app.playoff import tag_playoff
@@ -122,9 +123,41 @@ def api_schedule():
         start_date, end_date = _get_week_range(offset)
 
     # Fetch games from ESPN
-    games = get_all_games(start_date, end_date)
+    games = _tag_games(get_all_games(start_date, end_date))
 
-    # Tag each game with importance tier, availability, and playoff status
+    payload = {
+        "games": games,
+        "range": {
+            "start": start_date.isoformat(),
+            "end": end_date.isoformat(),
+        },
+    }
+
+    # Between seasons the padded month can end with no fixture left in
+    # it, and the Front Page then falls all the way through to "No games
+    # in this window". Reach one scan forward so it can name the real
+    # next fixture instead. Costs nothing in an ordinary week: the scan
+    # only runs when this window is genuinely exhausted.
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+    next_up = next_game_beyond_window(
+        games, end_date, now_iso,
+        lambda s, e: _tag_games(get_all_games(s, e)),
+    )
+    if next_up is not None:
+        payload["next_upcoming"] = next_up
+
+    return jsonify(payload)
+
+
+def _tag_games(games):
+    """
+    The standard tagging chain, then user data merged in.
+
+    Extracted so the lookahead scan produces games in exactly the same
+    shape as the main window's -- the Front Page renders the next-up
+    fixture with the ordinary card builder, which reads `tier`,
+    `availability` and the rest.
+    """
     games = tag_importance(games)
     games = tag_availability(games)
     games = tag_playoff(games)
@@ -132,21 +165,13 @@ def api_schedule():
     games = tag_storylines(games)
     games = tag_my_guys(games)
 
-    # Merge in user data (watched flags, notes)
     user_data = get_all_userdata()
     for game in games:
         gid = game.get("id", "")
         ud = user_data.get(gid, {})
         game["watched"] = ud.get("watched", False)
         game["user_notes"] = ud.get("notes", "")
-
-    return jsonify({
-        "games": games,
-        "range": {
-            "start": start_date.isoformat(),
-            "end": end_date.isoformat(),
-        },
-    })
+    return games
 
 
 @main.route("/api/games/<game_id>/watched", methods=["POST"])

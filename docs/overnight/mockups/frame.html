@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<!--
+  FRAME — pins a mockup to a true phone width for headless work.
+
+  Why this exists: `google-chrome --headless --window-size=390,844`
+  does NOT give a 390px viewport. Chrome clamps its window to a 500px
+  minimum on Linux, so every measurement and screenshot taken that way
+  is silently 500px wide — wide enough to hide exactly the overflow
+  bugs a phone pass is looking for (measured 2026-07-26: viewport 500).
+  An iframe has no such clamp, so the page inside really does lay out
+  at 390px.
+
+  Same-origin is required to measure inside the frame, so serve this
+  folder over HTTP rather than opening it as file:// —
+  `tools/shoot-mockups.py` does that automatically.
+
+  Usage: frame.html?w=390&src=<url-encoded page>
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>frame</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #B8C0CC; }
+  #stage {
+    width: max-content;
+    margin: 0 auto;
+    background: #EEF1F5;
+    box-shadow: 0 0 0 1px rgba(12,21,34,.22);
+  }
+  iframe { display: block; border: 0; }
+</style>
+</head>
+<body>
+<div id="stage"><iframe id="f" title="mockup"></iframe></div>
+<pre id="frame-out" style="font:12px monospace;padding:8px"></pre>
+<script>
+(function () {
+    var q = new URLSearchParams(location.search);
+    var w = parseInt(q.get("w") || "390", 10);
+    var src = q.get("src") || "calendar-a-replace.html";
+
+    var f = document.getElementById("f");
+    f.style.width = w + "px";
+    f.style.height = "844px";
+
+    f.addEventListener("load", function () {
+        var doc = f.contentDocument;
+
+        /* Grow the frame to its full content height so a viewport
+           screenshot captures the whole page instead of the fold. */
+        var h = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight);
+        f.style.height = h + "px";
+
+        var inner = f.contentWindow.innerWidth;
+        var probe = doc.getElementById("probe-out");
+        document.getElementById("frame-out").textContent =
+            "FRAME innerWidth=" + inner + " contentHeight=" + h + "\n" +
+            (probe ? probe.textContent : "(no probe on this page)");
+        document.title = "FRAME " + inner + "x" + h;
+    });
+
+    f.src = src;
+})();
+</script>
+</body>
+</html>

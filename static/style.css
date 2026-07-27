@@ -1434,6 +1434,154 @@ header {
 }
 
 /* Mobile rolling 7-day list */
+/* ── Mobile month grid — the glance layer above the day list ─────
+   Dylan's option B (Jul-26): a 7-column month sits on top of the
+   rolling day list and steers it. Every number below is forced by the
+   width. A 390px phone minus the two 18px page insets leaves 354px, so
+   a column is ~49px — enough for a date, a dot per sport and a count,
+   and nothing more. Cells are separated by 1px hairlines rather than
+   gaps because at 49px even a 4px gap is 8% of the cell.
+   No new tokens: every colour here is an existing :root value, so the
+   palette's AA verification still stands as documented. */
+
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--rule-hl);
+  border-top: 1px solid var(--rule-hl);
+  border-bottom: 1px solid var(--rule-hl);
+  margin: 0 var(--pad);
+}
+.mg-dow {
+  background: var(--page);
+  text-align: center;
+  padding: 5px 0 6px;
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.mg-cell {
+  background: var(--surface);
+  min-height: 52px;          /* the tap target — width cannot reach 44px */
+  padding: 5px 0 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.mg-cell.outside { background: var(--page-2); }
+.mg-cell.outside .mg-num { color: var(--ink-3); }
+
+.mg-num {
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  width: 22px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Today reuses the section tag's angled trailing edge instead of a
+   generic circle, so "now" reads in the app's own broadcast language. */
+.mg-cell.is-today .mg-num {
+  background: var(--ink);
+  color: #FFFFFF;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+}
+/* Selection is a ring, never a fill — a fill would fight the today chip
+   on the day they land on the same cell. */
+.mg-cell.selected { box-shadow: inset 0 0 0 2px var(--ink); }
+
+.mg-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 7px;
+  flex-wrap: nowrap;
+}
+/* Played vs still-to-come is a SHAPE difference, not a faded one.
+   Fading the dot was the first attempt and it failed twice over: at 5px
+   a 32%-opacity mark is nearly invisible on a white cell, and no opacity
+   that still reads as "dimmed" can clear the 3:1 contrast this palette
+   is documented as meeting (--nfl at 55% over white measures ~2.5:1).
+   A hollow ring keeps the sport colour at full strength, reads at a
+   glance, and survives colour-blindness — which an opacity step does
+   not. Dots go to 6px so the 1.5px ring has room. */
+.mg-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: currentColor;
+}
+.mg-dot.soccer     { color: var(--soccer); }
+.mg-dot.football   { color: var(--nfl); }
+.mg-dot.basketball { color: var(--nba); }
+.mg-dot.dimmed {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+/* The game count. Once the dots name sports rather than count games,
+   this number is the "how busy is that day" signal — so it is set a
+   step larger than a caption would be. */
+.mg-more {
+  font-family: var(--f-mono);
+  font-weight: 500;
+  font-size: 0.63rem;
+  color: var(--ink-2);
+  line-height: 1;
+  margin-left: 1px;
+}
+
+.mg-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px var(--pad) 2px;
+  font-family: var(--f-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.mg-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.mg-legend-num { font-weight: 500; color: var(--ink); }
+
+/* Section tag above the day list, so the list reads as its own thing
+   and not as a continuation of the grid. */
+.list-tag-row { padding: 22px var(--pad) 0; }
+
+/* Shown when the list ran out of loaded days before it ran out of
+   seven — the arrows are at the top of the screen and easy to miss. */
+.mobile-more {
+  margin: 4px var(--pad) 8px;
+  min-height: var(--tap-min);
+  background: var(--surface);
+  border: 1px solid var(--rule-hl);
+  border-radius: var(--r-chip);
+  color: var(--ink);
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.mobile-more:active { background: var(--page-2); }
+
 .mobile-calendar {
   display: flex;
   flex-direction: column;

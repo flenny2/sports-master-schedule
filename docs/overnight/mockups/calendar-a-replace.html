@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<!--
+  MOCKUP A — "REPLACE": the month grid IS the phone calendar.
+
+  Inert. Loads only its siblings in this folder; it never touches
+  static/. Open it directly in a browser at a 390px width, or run
+  tools/shoot-mockups.py to measure and screenshot it.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup A — month grid replaces the 7-day list</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="calendar.css">
+<style>
+  /* Page-level reset only. Everything inside .phone is styled by
+     calendar.css, which scopes the app's tokens to that element. */
+  html, body { margin: 0; padding: 0; background: #EEF1F5; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="mock-note">
+    <b>MOCKUP A — REPLACE.</b> The month grid is the phone calendar. Tap any day and
+    that day's games appear underneath. The old rolling 7-day list is gone.
+    <br><br>
+    Real ESPN games. It opens on <b>September</b> and treats Sep 13 as "today", because
+    the actual today (Jul 26) sits in the dead week between the World Cup final and the
+    NFL opener — an empty grid would tell you nothing. Use the arrows to see July and
+    August, which is what the quiet weeks really look like.
+  </div>
+
+  <header class="mock-mast">
+    <h1>Sports Master Schedule</h1>
+    <nav class="mock-tabs">
+      <span>Home</span><span class="on">Calendar</span><span>Playoffs</span><span>Tables</span>
+    </nav>
+  </header>
+
+  <main id="view"></main>
+</div>
+
+<script src="data.js"></script>
+<script src="calendar.js"></script>
+<script>makeCalendar(document.getElementById("view"), "replace");</script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<!--
+  PROBE — headless measurement harness for the two calendar mockups.
+
+  Not a review surface. It loads exactly the same data/CSS/JS as the
+  mockups, then MEASURES the rendered result and dumps the numbers into
+  the DOM so `google-chrome --headless --dump-dom` can read them.
+
+  Why measure at all (headless-qa rule 2): a DOM-existence check passes
+  on a broken layout. The thing that can actually go wrong with a
+  7-column grid on a 390px phone is geometry — cells too narrow to tap,
+  dots overflowing their cell, or the page scrolling sideways — and none
+  of those show up as a missing element.
+
+  Usage:
+    google-chrome --headless --window-size=390,844 \
+      --dump-dom 'file:///.../probe.html?mode=replace'
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>probe</title>
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="calendar.css">
+</head>
+<body>
+<style>html, body { margin: 0; padding: 0; background: #EEF1F5; }</style>
+<div class="phone">
+<header class="mock-mast">
+  <h1>Sports Master Schedule</h1>
+  <nav class="mock-tabs">
+    <span>Home</span><span class="on">Calendar</span><span>Playoffs</span><span>Tables</span>
+  </nav>
+</header>
+<main id="view"></main>
+</div>
+<pre id="probe-out"></pre>
+
+<script src="data.js"></script>
+<script src="calendar.js"></script>
+<script>
+  var MODE = new URLSearchParams(location.search).get("mode") || "replace";
+  makeCalendar(document.getElementById("view"), MODE);
+</script>
+<script>
+(function () {
+    var fails = [], notes = [];
+
+    function check(name, ok, detail) {
+        (ok ? notes : fails).push((ok ? "PASS  " : "FAIL  ") + name + " — " + detail);
+    }
+
+    var cells = document.querySelectorAll(".mg-cell");
+    var grid  = document.querySelector(".month-grid");
+
+    check("grid rendered", !!grid && cells.length >= 28,
+          cells.length + " day cells");
+
+    /* No sideways scroll. The single most damaging phone bug and the
+       one a screenshot hides, because the shot is clipped to the
+       viewport width. */
+    check("no horizontal overflow",
+          document.documentElement.scrollWidth <= window.innerWidth,
+          "scrollWidth " + document.documentElement.scrollWidth +
+          " vs viewport " + window.innerWidth);
+
+    /* Every cell is a tap target. 44px is the app's own --tap-min; a
+       50px-wide cell cannot also be 44px tall unless we say so, hence
+       the min-height in the CSS. Width is allowed to be narrower than
+       44 because seven columns will not fit otherwise — the vertical
+       dimension is what carries the tap. */
+    var minH = Infinity, minW = Infinity;
+    cells.forEach(function (c) {
+        var r = c.getBoundingClientRect();
+        if (r.height < minH) minH = r.height;
+        if (r.width  < minW) minW = r.width;
+    });
+    check("cell height >= 44px tap target", minH >= 44,
+          "smallest cell " + minW.toFixed(1) + " x " + minH.toFixed(1));
+
+    /* Dots and the "+n" label must stay inside their cell.
+       MEASURE EACH CHILD, NOT THE ROW. The first version of this check
+       measured the .mg-dots container and reported 0 overflow while the
+       "+10" label was visibly clipped in the screenshot: the row is a
+       nowrap flex container, so its own box stays put while its children
+       spill past the edge. Exactly headless-qa rule 2 — a green check
+       on a broken layout. */
+    var overflow = 0, worst = "";
+    cells.forEach(function (c) {
+        var cr = c.getBoundingClientRect();
+        c.querySelectorAll(".mg-dots > *").forEach(function (kid) {
+            var kr = kid.getBoundingClientRect();
+            if (kr.left < cr.left - 0.5 || kr.right > cr.right + 0.5) {
+                overflow++;
+                worst = c.getAttribute("aria-label") + " / " +
+                        (kid.textContent || kid.className);
+            }
+        });
+    });
+    check("day dots and +n stay inside their cell", overflow === 0,
+          overflow === 0 ? "0 marks overflow across " + cells.length + " cells"
+                         : overflow + " overflow, e.g. " + worst);
+
+    /* The glance layer must not hide a sport. Sun Sep 13 holds both a
+       Premier League fixture and a full NFL slate; if its cell shows
+       one dot, the dedupe has regressed to first-n-games. */
+    var busy = null;
+    cells.forEach(function (c) {
+        var lbl = c.getAttribute("aria-label") || "";
+        if (lbl.indexOf("September 13") !== -1) busy = c;
+    });
+    check("a mixed-sport day shows every sport on it",
+          !!busy && busy.querySelectorAll(".mg-dot").length >= 2,
+          busy ? busy.querySelectorAll(".mg-dot").length + " sport dots on " +
+                 busy.getAttribute("aria-label") : "Sep 13 cell not found");
+
+    /* And the count must be the real total, not the number of dots. */
+    check("the day count is the true game total",
+          !!busy && busy.querySelector(".mg-more") &&
+          busy.querySelector(".mg-more").textContent === "14",
+          busy && busy.querySelector(".mg-more")
+              ? "reads " + busy.querySelector(".mg-more").textContent + ", expected 14"
+              : "no count rendered");
+
+    /* Today and selection must both be visible, and on the same cell
+       they must not cancel each other out. */
+    var today = document.querySelector(".mg-cell.is-today");
+    check("today marker present", !!today,
+          today ? "on " + today.getAttribute("aria-label") : "missing");
+    if (today) {
+        var num = today.querySelector(".mg-num");
+        var bg = getComputedStyle(num).backgroundColor;
+        check("today chip is filled ink", bg !== "rgba(0, 0, 0, 0)", bg);
+        check("today cell also carries the selection ring",
+              getComputedStyle(today).boxShadow.indexOf("inset") !== -1,
+              getComputedStyle(today).boxShadow);
+    }
+
+    /* Mode-specific: the whole point of the fork. */
+    var list  = document.querySelector(".mobile-calendar");
+    var panel = document.querySelector(".day-panel");
+    if (MODE === "replace") {
+        check("mode replace: day panel present, rolling list absent",
+              !!panel && !list, "panel=" + !!panel + " list=" + !!list);
+    } else {
+        check("mode both: rolling list present, day panel absent",
+              !!list && !panel, "list=" + !!list + " panel=" + !!panel);
+        check("mode both: list shows 7 days",
+              document.querySelectorAll(".mobile-day").length === 7,
+              document.querySelectorAll(".mobile-day").length + " days");
+    }
+
+    /* Cards must render real content, not empty shells. Every team name
+       node has to be non-empty — an all-blank card still satisfies a
+       plain "does .game-card exist" check. */
+    var names = document.querySelectorAll(".up-name, .sb-name");
+    var blank = 0;
+    names.forEach(function (n) { if (!n.textContent.trim()) blank++; });
+    check("every team name on a card is non-empty",
+          names.length > 0 && blank === 0,
+          names.length + " names, " + blank + " blank");
+
+    /* The duel seam is the design signature; a card whose seam colours
+       never resolved would silently show the sport fallback. */
+    var seamed = 0;
+    document.querySelectorAll(".game-card").forEach(function (c) {
+        if (c.style.getPropertyValue("--seam-a")) seamed++;
+    });
+    check("every card carries duel-seam colours",
+          seamed === document.querySelectorAll(".game-card").length,
+          seamed + "/" + document.querySelectorAll(".game-card").length);
+
+    /* Kickoff time must have both a number and a meridiem line — the
+       U+202F narrow-space trap eats the second half silently. */
+    var t = document.querySelector(".up-time");
+    check("kickoff time keeps its AM/PM line",
+          !!t && !!t.querySelector("small") &&
+          /(AM|PM) PT/.test(t.querySelector("small").textContent),
+          t ? JSON.stringify(t.textContent.trim()) : "none");
+
+    var out = document.getElementById("probe-out");
+    out.textContent = "MODE=" + MODE + "\n" +
+        fails.concat(notes).join("\n") + "\n" +
+        (fails.length ? "RESULT: " + fails.length + " FAILED" : "RESULT: ALL PASS");
+    document.title = fails.length ? "PROBE FAIL" : "PROBE PASS";
+})();
+</script>
+</body>
+</html>
