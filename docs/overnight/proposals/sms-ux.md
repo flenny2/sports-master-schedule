@@ -8,7 +8,7 @@ KEEP / DISCARD column is yours; I leave it blank. IDs are never renumbered or re
 <https://claude.ai/code/artifact/a1ac028b-0ea0-47bc-b52a-918e87ce2a65> — private,
 rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL is stable.
 **Branch:** `auto/overnight-sms-ux` · **Nothing is pushed. Nothing is merged.**
-**Suite:** 178 passed (`./tools/validate`), green at every commit on this branch.
+**Suite:** 197 passed (`./tools/validate`), green at every commit on this branch.
 
 ---
 
@@ -41,13 +41,39 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   use, on a repo where shipping is a deploy.
 - **KEEP / DISCARD** —
 
+### SMS-2 — The front page can name the next game again
+
+- **WHAT** — Between seasons the Home page's "Today's Slate" showed a dead line:
+  *"No games in this window — browse the calendar."* It now shows a card:
+  **NO GAMES TODAY · NEXT UP — CAR at ARI, Thu Aug 6, 5:00 PM, in 10d 23h.**
+- **WHY** — There are no games for another eleven days, so that dead line is what the
+  front page has been showing you every time you open it, and will keep showing until
+  August 7. The app already knew how to display "next up" — it just could not find the
+  game, because the front page only ever looks inside the month it has loaded, and the
+  next fixture was five days past the end of it.
+- **WHERE** — New `app/lookahead.py` (pure, 19 tests, no network) + a scan wired into
+  `/api/schedule` + three lines in `static/app.js`. Commit `fd10a53`.
+  Before/after: `docs/overnight/shots/audit-home-390.png` →
+  `docs/overnight/shots/sms-2-home-nextup-after.png`.
+- **RISK** — This is the first change on this branch that touches code the live app
+  runs, so unlike SMS-1 it is a real deploy if you keep it. When the window runs dry the
+  server makes one extra ESPN call to look 45 days ahead — that is a slower response on
+  those days only, and on Render's free tier a slow request is more noticeable than it
+  sounds. If ESPN fails during that scan the page quietly falls back to the old message
+  rather than erroring, which is the right trade but does mean the failure is invisible.
+  A gap longer than 45 days would still show the old line.
+- **KEEP / DISCARD** —
+
 ---
 
 ## Idea queue
 
 1. ~~§mobile-month-calendar~~ → **CYCLE 1, shipped as SMS-1.**
-2. Off-season Home audit — late July, so the front page's job is "what's coming", not
-   "what's on". Check it isn't mostly empty boxes.
+2. ~~Off-season Home audit~~ → **CYCLE 2, shipped as SMS-2.** The audit found one real
+   defect and it is fixed. Still open from the same look: the MAIN EVENT marquee — the
+   front page's designed centrepiece — renders nothing at all when there are no games
+   today, so the page has no headline for weeks at a time. Promoting the next fixture
+   into that slot is a taste call, so it would ship as mockups.
 3. Phone chrome pass — sticky tabs, safe-area/notch, tap-target sizes. Owed since the
    Jul-22 deploy.
 4. Game-card density at 390px — how much fits before it stops being glanceable.
@@ -61,3 +87,9 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   the probe now asserts the width so it cannot regress silently;
   (b) the first overflow assert measured the dot *row* rather than its children and passed
   green while the "+10" marker was visibly clipped in the screenshot.
+- **CYCLE 2 — off-season "next up" lookahead — SHIPPED `fd10a53`.** Found by looking at
+  the running app on a phone-width viewport, not by reading code — the dead line was in a
+  branch that should have been unreachable. First pass got the contract wrong (the
+  endpoint returned a game the caller already had, duplicating it); tightened so the new
+  field can only ever mean "a fixture your window does not contain", with a test pinning
+  that the key is absent in the ordinary case. 178 → 197 tests.

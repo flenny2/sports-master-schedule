@@ -29,9 +29,19 @@ MOCKUPS = os.path.join(REPO, "docs", "overnight", "mockups")
 OUT = os.path.join(REPO, "docs", "overnight", "review-board.html")
 
 
+SHOTS = os.path.join(REPO, "docs", "overnight", "shots")
+
+
 def read(name):
     with open(os.path.join(MOCKUPS, name), encoding="utf-8") as f:
         return f.read()
+
+
+def shot_uri(name):
+    """A screenshot as a data URI — the Artifact CSP blocks image hosts."""
+    import base64
+    with open(os.path.join(SHOTS, name), "rb") as f:
+        return "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
 
 # ── Board styles ────────────────────────────────────────────────────
@@ -227,6 +237,28 @@ BOARD_CSS = """
   background: #EEF1F5;
 }
 
+/* Before/after pair. The images are full-fold phone screenshots with
+   dead space below the interesting part, so CSS crops from the top
+   rather than shipping a second, cropped copy of each PNG. */
+.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ba figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.ba figcaption {
+  font-family: var(--f-mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--txt-2);
+}
+.ba .shot {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  object-position: 50% 62%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #EEF1F5;
+}
+
 /* Proposal entries. The ID is the decision surface, so it leads. */
 .prop {
   background: var(--desk-2);
@@ -396,8 +428,9 @@ BOARD_HTML = """
   <section style="display:flex;flex-direction:column;gap:16px">
     <h2>The proposal</h2>
     <p class="muted">
-      Reply with IDs — "keep SMS-1" or "discard SMS-1" — and the morning session does
-      exactly that. IDs are never reused, so they stay valid forever.
+      Reply with IDs — "keep SMS-1 SMS-2", "discard SMS-2" — and the morning session does
+      exactly that. IDs are never reused, so they stay valid forever. SMS-1 is a choice
+      between two designs; SMS-2 is a straight keep-or-discard.
     </p>
 
     <article class="prop">
@@ -430,13 +463,66 @@ BOARD_HTML = """
         <div class="verdict"><dt>Keep / discard</dt><dd>yours — reply A, B, or discard</dd></div>
       </dl>
     </article>
+
+    <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-2</span>
+        <span class="prop-title">The front page can name the next game again</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          Between seasons the Home page's Today's Slate showed a dead line —
+          "No games in this window — browse the calendar." It now shows the actual next
+          fixture: <b>no games today · next up — CAR at ARI, Thu Aug 6, 5:00 PM,
+          in 10 days.</b>
+        </dd></div>
+        <div><dt>Before / after</dt><dd>
+          <div class="ba">
+            <figure>
+              <img class="shot" alt="Home page showing a no-games message"
+                   src="__SHOT_BEFORE__">
+              <figcaption>Before — a dead line</figcaption>
+            </figure>
+            <figure>
+              <img class="shot" alt="Home page showing the next fixture"
+                   src="__SHOT_AFTER__">
+              <figcaption>After — the real next game</figcaption>
+            </figure>
+          </div>
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          There are no games for another eleven days, so that dead line is what the front
+          page shows you every time you open it until August 7. The app already knew how
+          to display "next up" — it just could not find the game, because the front page
+          only ever looks inside the month it has loaded and the next fixture was five
+          days past the end of it.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          New <code>app/lookahead.py</code> (19 tests, no network), a scan wired into the
+          schedule endpoint, and three lines in <code>static/app.js</code>.
+          Commit <code>fd10a53</code>.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          This is the first change here that touches code the live app runs — unlike
+          SMS-1, keeping it means a deploy. When the window runs dry the server makes one
+          extra ESPN call to look 45 days ahead, so those days answer more slowly, and on
+          Render's free tier slow is more noticeable than it sounds. If ESPN fails during
+          that scan the page quietly falls back to the old message rather than erroring:
+          the right trade, but it makes the failure invisible. A gap longer than 45 days
+          would still show the old line.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>yours</dd></div>
+      </dl>
+    </article>
   </section>
 
   <section style="display:flex;flex-direction:column;gap:12px">
     <h2>Next in the queue</h2>
     <ol class="list">
-      <li><b>Off-season home page.</b> It is late July, so the front page's job right now is
-        "what is coming", not "what is on". Worth checking it is not mostly empty boxes.</li>
+      <li><b>The empty headline slot.</b> The front page's Main Event banner renders nothing
+        at all on a day with no games, so for weeks at a time the page has no headline.
+        Putting the next fixture there is a taste call, so it would come to you as
+        mockups.</li>
       <li><b>Phone chrome pass.</b> Sticky tabs, the notch safe area, tap-target sizes —
         owed since the July 22 deploy.</li>
       <li><b>Game-card size on a phone.</b> How much fits before a card stops being
@@ -447,7 +533,7 @@ BOARD_HTML = """
   <footer class="foot">
     <b>Branch</b> auto/overnight-sms-ux · nothing merged, nothing pushed<br>
     <b>Deploy</b> untouched — pushing this repo is a deploy and only ever your hand<br>
-    <b>Tests</b> 178 passing (./tools/validate)<br>
+    <b>Tests</b> 197 passing (./tools/validate)<br>
     <b>Measured</b> at a true 390px viewport, both layouts, all geometry checks green<br>
     <b>Full detail</b> docs/overnight/proposals/sms-ux.md
   </footer>
@@ -504,7 +590,10 @@ def main():
         BOARD_CSS,
         read("calendar.css"),
         "</style>",
-        BOARD_HTML.replace("__HASH__", head),
+        (BOARD_HTML
+            .replace("__HASH__", head)
+            .replace("__SHOT_BEFORE__", shot_uri("audit-home-390.png"))
+            .replace("__SHOT_AFTER__", shot_uri("sms-2-home-nextup-after.png"))),
         "<script>",
         read("data.js"),
         "</script>",
