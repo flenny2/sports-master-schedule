@@ -152,7 +152,7 @@ read-only audit can verify this run without a live reviewer seat.
   rather than a replacement — that is the part I would want your read on. Both are
   mockups: choosing one is then a real change to the page you open most, on a repo
   where shipping is a deploy.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — **DEFERRED, not declined** (Dylan by phone, 2026-07-27 ~20:30): *"I will wait"* — he wants a review sitting where he can see the two screenshots, because picking from titles would waste the work. Banked at the meta desk in `reports/dylan-rulings-jul27.md` under **Explicitly deferred — do NOT read as approval**. No verdict yet, so no `CLOSED` line; recorded here so nobody re-asks and nobody mistakes the silence for a keep.
 - **RECEIPTS** — suite 206 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · mockups only — no file the app loads was touched
 
 ### SMS-6 — The August checklist now runs itself, and one real bug in it is fixed
@@ -464,6 +464,27 @@ read-only audit can verify this run without a live reviewer seat.
   both and closes the documented id-collision trap. Verified in BOTH directions,
   which is what makes it a fix rather than a deletion: the August PL card shows no
   row, the July World Cup card still shows one.
+- **PASS 2026-07-27 late — no new proposal, deliberately.** Checked for a ruling on
+  SMS-4..SMS-11 (rule 11 re-read: no `STOP-THE-RUN`, no `SLOW-THE-RUN`). One verdict
+  existed and was not in this file: **SMS-5 is DEFERRED by Dylan, not declined** — *"I
+  will wait"* for a sitting where he can see the two screenshots. Banked at the meta desk
+  (`reports/dylan-rulings-jul27.md`), whose own header says a proposal file showing the ID
+  as open until someone stamps it is *expected, not a lost verdict*. Stamped here now, so
+  no future session re-asks and nobody reads the silence as a keep.
+  **Why nothing was built this pass, stated as a judgement rather than a rule firing:**
+  rule 12's trigger is a lane that cannot name a next cycle, and I can name two (the team
+  detail view; the NFC mini table on Home). What is actually true is different and worse —
+  **the queue is review-bound, not idea-bound.** Seven defect proposals sit undecided, and
+  Dylan's own stated blocker on SMS-5 is finding a sitting to review in. Adding an eighth
+  would have made his one blocker heavier. Rule 16 covers "not now" but it is HIS lever and
+  he has not pulled it, so this is my call and it is recorded as mine.
+  **What was done instead attacks the constraint:** the board now opens with *the seven, in
+  one screen* — one line of case per ID and a stated recommendation, so all seven can be
+  answered with `keep all seven`. The full entries stay below as depth. SMS-5's slot on the
+  board says he already answered rather than asking again.
+  **Cadence: maintenance from here** — longest wake, and each wake re-reads this file's top,
+  the charter, and TODOS before doing anything. Building resumes when he rules, or when
+  something real turns up.
 - **Run status, 2026-07-27: OPEN-ENDED on Dylan's direct word** (lane-kickoffs rule 10) —
   finishing the chartered job is not the end. Ends only on his word here, a
   `STOP-THE-RUN` line at the top of this file, or a fence that needs him.
