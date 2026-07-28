@@ -259,6 +259,13 @@ BOARD_CSS = """
   color: var(--txt-2);
 }
 .ba .shot.tall { height: 420px; object-position: 50% 20%; }
+/* The notch pair is the exception to the side-by-side default: its evidence
+   is a thin red band overlapping four words of text, and that does not
+   survive being halved on a phone AND cropped. Show these whole, stacked,
+   and pair them only once there is room. */
+.ba.tall-pair { grid-template-columns: 1fr; }
+.ba.tall-pair .shot { height: auto; object-fit: contain; }
+@media (min-width: 620px) { .ba.tall-pair { grid-template-columns: 1fr 1fr; } }
 .ba .shot {
   width: 100%;
   height: 300px;
@@ -313,6 +320,26 @@ BOARD_CSS = """
 .risk dd { color: var(--risk); }
 .verdict dd { color: var(--txt-2); font-style: italic; }
 
+/* Triage bands. A flat list of proposals is what makes review slow, so each
+   one sits under the heading that says how hard the call is. The label is a
+   rule + a word rather than a colour block: the board already spends its one
+   accent on gold, and a second fill would compete with the specimens. */
+.band {
+  display: flex; align-items: baseline; gap: 12px;
+  margin: 6px 0 -6px;
+}
+.band-name {
+  font-family: var(--f-disp); font-weight: 700; font-size: 1.02rem;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-tx);
+  white-space: nowrap;
+}
+.band-note { color: var(--txt-2); font-size: 0.88rem; }
+.band::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* Settled proposals stay on the board as the record, at lower contrast so
+   they cannot be mistaken for something still waiting on him. */
+.prop.settled { opacity: 0.72; }
+
 .list { margin: 0; padding-left: 1.15rem; display: grid; gap: 7px; }
 .list li { font-size: 0.96rem; }
 .foot {
@@ -345,106 +372,125 @@ BOARD_HTML = """
 <div class="wrap">
 
   <header class="head">
-    <div class="eyebrow">Sports hub · overnight lane · night of Sat 26 Jul 2026</div>
-    <h1>The calendar,<br>built your way</h1>
+    <div class="eyebrow">Sports hub · lane · Mon 27 Jul 2026</div>
+    <h1>The phone frame,<br>measured and fixed</h1>
     <p class="lede">
-      You picked <b>B — keep both</b>, so the phone Calendar tab now opens on a month grid
-      with your scrolling day list still underneath it. Tap a day in the grid and the list
-      jumps there. It is built, measured on a real 390px phone viewport, and waiting on
-      your branch.
+      One new thing to decide: <b>SMS-4</b>. On a real iPhone the tab row was sliding up
+      behind the clock as you scrolled, and a third of the things you can tap were smaller
+      than a fingertip. Both are fixed, measured, and waiting on your word.
     </p>
     <p class="muted">
-      The two mockups are still below, unchanged, as the record of what you were choosing
-      between. They are separate pages that cannot touch the app.
+      SMS-1, SMS-2 and SMS-3 are the calendar work you already kept on 26 July. They are
+      still on this board, greyed, as the record — nothing there needs you again.
     </p>
   </header>
 
   <section class="decide">
-    <h2>Decided — B</h2>
-    <p>You chose: the month grid sits <b>above</b> the scrolling list rather than replacing it.
-    Built as SMS-3 below. Here is what each option was, for the record.</p>
+    <h2>What is still owed by you</h2>
+    <p><b>Two things, and they are separate.</b></p>
 
     <div class="opt">
-      <span class="opt-name">A · Replace</span>
-      <span class="muted">Month grid, tap a day, that day's games appear below it. The scrolling
-      list is retired. Simplest result: one calendar, one way to read it.</span>
+      <span class="opt-name">1 · Keep or discard SMS-4</span>
+      <span class="muted">Reply with the ID. The full case is below, with a picture of the
+      before and after.</span>
     </div>
     <div class="opt">
-      <span class="opt-name">B · Keep both</span>
-      <span class="muted">Month grid on top for the glance, the scrolling list still underneath.
-      Tapping a day moves the list to start there, so the grid steers the feed.</span>
+      <span class="opt-name">2 · The deploy you already approved</span>
+      <span class="muted">SMS-1, SMS-2 and SMS-3 are merged onto <code>master</code> and
+      have never been pushed, because pushing this repo is a deploy and that is only ever
+      your hand.</span>
     </div>
 
     <div class="rec">
-      <b>All three kept</b> — your word, 26 July — and merged onto <code>master</code> as
-      <code>f33309b</code>. 197 tests green, verified against the running app at a real
-      390px viewport. <b>Nothing is deployed.</b> One command from you does that:
+      <b>Nothing is live.</b> One command deploys what you kept last night:
       <br><br>
       <code class="cmd">git push origin master</code>
       <br>
-      Kept, for the record: SMS-3 is the calendar you chose, SMS-2 removes the dead line
-      the front page shows every day until 7 August, and SMS-1 is the pair of mockups that
-      record why SMS-3 looks the way it does.
+      SMS-4 is <b>not</b> in that push — it sits on the branch
+      <code>auto/lane-sms-jul27</code> until you say keep.
     </div>
-  </section>
-
-  <h2 style="margin-bottom:-14px">The two mockups, for the record</h2>
-  <div class="switch" role="group" aria-label="Choose a layout to view">
-    <button type="button" id="btn-a" aria-pressed="true">A · Replace</button>
-    <button type="button" id="btn-b" aria-pressed="false">B · Keep both</button>
-  </div>
-
-  <div class="stages">
-    <div class="stage" id="stage-a">
-      <div class="stage-cap"><b>A · Replace</b> — grid, then the day you tapped</div>
-      <div class="bezel">
-        <div class="phone">
-          <header class="mock-mast">
-            <h1>Sports Master Schedule</h1>
-            <nav class="mock-tabs">
-              <span>Home</span><span class="on">Calendar</span><span>Playoffs</span><span>Tables</span>
-            </nav>
-          </header>
-          <main id="view-a"></main>
-        </div>
-      </div>
-    </div>
-
-    <div class="stage" id="stage-b" hidden>
-      <div class="stage-cap"><b>B · Keep both</b> — grid, then the scrolling list</div>
-      <div class="bezel">
-        <div class="phone">
-          <header class="mock-mast">
-            <h1>Sports Master Schedule</h1>
-            <nav class="mock-tabs">
-              <span>Home</span><span class="on">Calendar</span><span>Playoffs</span><span>Tables</span>
-            </nav>
-          </header>
-          <main id="view-b"></main>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <section>
-    <h2 style="margin-bottom:10px">Why it opens on September</h2>
-    <p class="muted">
-      Today is a dead week — the World Cup final was the 19th and the NFL does not start
-      until September. A month grid of empty squares would tell you nothing about whether
-      the design works, so both mockups open on September and treat Sunday the 13th as
-      "today". Arrow back to July and August to see what the quiet weeks really look like.
-      The real app always uses the real date.
-    </p>
   </section>
 
   <section style="display:flex;flex-direction:column;gap:16px">
-    <h2>The proposal</h2>
+    <h2>The proposals</h2>
     <p class="muted">
-      Reply with IDs — "keep SMS-1 SMS-2 SMS-3", "discard SMS-2" — and the next session
-      does exactly that. IDs are never reused, so they stay valid forever.
+      Reply with IDs — "keep SMS-4", "discard SMS-4" — and the next session does exactly
+      that. IDs are never reused, so they stay valid forever.
     </p>
 
+    <div class="band">
+      <span class="band-name">Obvious keep</span>
+      <span class="band-note">a defect fixed, no taste call in it</span>
+    </div>
+
     <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-4</span>
+        <span class="prop-title">The phone chrome stops hiding behind the notch</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          Two fixes to the frame that wraps every screen. <b>The notch:</b> when you
+          scrolled, the HOME / CALENDAR / PLAYOFFS / TABLES row slid up behind the iPhone's
+          clock, and the bottom line of the footer sat under the home bar. Both now stop at
+          the edge of the safe area. <b>Fingertips:</b> the three filter chips, the ‹ ›
+          month arrows, the Mark Watched button and the "Full tables" link were all shorter
+          than a fingertip. All four are now the standard size.
+        </dd></div>
+        <div><dt>Before / after</dt><dd>
+          <div class="ba tall-pair">
+            <figure>
+              <img class="shot" alt="Tab labels sitting inside the reserved status bar zone"
+                   src="__SHOT_CHROME_BEFORE__">
+              <figcaption>Before — the tabs, and the footer's last line, are inside the
+                red zones</figcaption>
+            </figure>
+            <figure>
+              <img class="shot" alt="Tab labels sitting clear below the reserved zone"
+                   src="__SHOT_CHROME_AFTER__">
+              <figcaption>After — both clear of them</figcaption>
+            </figure>
+          </div>
+          <p class="muted" style="margin-top:10px">
+            The red bands are the strips an iPhone keeps for its own clock and home bar.
+            Anything the app draws under one of them is something you cannot read or tap.
+            A desktop browser never shows them, which is why this survived since 22 July.
+          </p>
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          I measured the running app at a real phone width rather than reading the code:
+          <b>16 of the 71 things you can tap</b> were under the 44-pixel minimum the app's
+          own design notes already ask for. The notch half is the worse one. The page is
+          deliberately set to run edge to edge under the notch — that is the right look —
+          but nothing in the styling ever gave that space back, so on your phone, and
+          especially once it is added to the Home Screen, the tabs were unreadable while
+          scrolled.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          <code>static/style.css</code>, a new test file, and a new phone harness
+          <code>tools/qa-phone-chrome.py</code>. Commit <code>667c6bb</code> on branch
+          <code>auto/lane-sms-jul27</code>. 197 → 206 tests. Desktop re-shot to show it
+          did not move.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          I have no iPhone to check this on, and neither does the test — no headless
+          browser reports real notch measurements, so the harness feeds it fake ones and
+          proves the layout <i>responds</i>. That is strong evidence the wiring is right
+          and weak evidence about the exact look on your handset, which is the one thing
+          worth eyeballing after a deploy. The taller chips also cost about 10 pixels of
+          vertical space at the top of every screen — a real trade against a bigger target.
+          Live code: keeping it means a deploy.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
+      </dl>
+    </article>
+
+    <div class="band">
+      <span class="band-name">Already decided</span>
+      <span class="band-note">kept 26 July, merged, on the branch — the record only</span>
+    </div>
+
+    <article class="prop settled">
       <div class="prop-head">
         <span class="prop-id">SMS-3</span>
         <span class="prop-title">Option B, built for real</span>
@@ -493,7 +539,7 @@ BOARD_HTML = """
       </dl>
     </article>
 
-    <article class="prop">
+    <article class="prop settled">
       <div class="prop-head">
         <span class="prop-id">SMS-1</span>
         <span class="prop-title">Phone month calendar — two mockups</span>
@@ -509,7 +555,7 @@ BOARD_HTML = """
           "next few weeks at a glance" you asked for.
         </dd></div>
         <div><dt>Where</dt><dd>
-          Branch <code>auto/overnight-sms-ux</code>, commit <code>__HASH__</code>.
+          Branch <code>auto/overnight-sms-ux</code>, commit <code>83674f0</code>.
           New files only, all under <code>docs/overnight/</code> plus two scripts in
           <code>tools/</code>. No file the app loads was touched.
         </dd></div>
@@ -524,7 +570,7 @@ BOARD_HTML = """
       </dl>
     </article>
 
-    <article class="prop">
+    <article class="prop settled">
       <div class="prop-head">
         <span class="prop-id">SMS-2</span>
         <span class="prop-title">The front page can name the next game again</span>
@@ -576,6 +622,55 @@ BOARD_HTML = """
     </article>
   </section>
 
+  <h2 style="margin-bottom:-14px">The two mockups, for the record</h2>
+  <div class="switch" role="group" aria-label="Choose a layout to view">
+    <button type="button" id="btn-a" aria-pressed="true">A · Replace</button>
+    <button type="button" id="btn-b" aria-pressed="false">B · Keep both</button>
+  </div>
+
+  <div class="stages">
+    <div class="stage" id="stage-a">
+      <div class="stage-cap"><b>A · Replace</b> — grid, then the day you tapped</div>
+      <div class="bezel">
+        <div class="phone">
+          <header class="mock-mast">
+            <h1>Sports Master Schedule</h1>
+            <nav class="mock-tabs">
+              <span>Home</span><span class="on">Calendar</span><span>Playoffs</span><span>Tables</span>
+            </nav>
+          </header>
+          <main id="view-a"></main>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage" id="stage-b" hidden>
+      <div class="stage-cap"><b>B · Keep both</b> — grid, then the scrolling list</div>
+      <div class="bezel">
+        <div class="phone">
+          <header class="mock-mast">
+            <h1>Sports Master Schedule</h1>
+            <nav class="mock-tabs">
+              <span>Home</span><span class="on">Calendar</span><span>Playoffs</span><span>Tables</span>
+            </nav>
+          </header>
+          <main id="view-b"></main>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <h2 style="margin-bottom:10px">Why it opens on September</h2>
+    <p class="muted">
+      Today is a dead week — the World Cup final was the 19th and the NFL does not start
+      until September. A month grid of empty squares would tell you nothing about whether
+      the design works, so both mockups open on September and treat Sunday the 13th as
+      "today". Arrow back to July and August to see what the quiet weeks really look like.
+      The real app always uses the real date.
+    </p>
+  </section>
+
   <section style="display:flex;flex-direction:column;gap:12px">
     <h2>Next in the queue</h2>
     <ol class="list">
@@ -583,18 +678,19 @@ BOARD_HTML = """
         at all on a day with no games, so for weeks at a time the page has no headline.
         Putting the next fixture there is a taste call, so it would come to you as
         mockups.</li>
-      <li><b>Phone chrome pass.</b> Sticky tabs, the notch safe area, tap-target sizes —
-        owed since the July 22 deploy.</li>
       <li><b>Game-card size on a phone.</b> How much fits before a card stops being
         glanceable.</li>
     </ol>
+    <p class="muted">Done since the last board: the phone chrome pass, above as SMS-4.</p>
   </section>
 
   <footer class="foot">
-    <b>Branch</b> auto/overnight-sms-ux · merged to master (f33309b) · <b>not pushed</b><br>
+    <b>Branch</b> auto/lane-sms-jul27 (SMS-4, undecided) · off master, which carries
+    SMS-1..3 merged and <b>never pushed</b><br>
     <b>Deploy</b> untouched — pushing this repo is a deploy and only ever your hand<br>
-    <b>Tests</b> 197 passing (./tools/validate)<br>
-    <b>Measured</b> at a true 390px viewport, both layouts, all geometry checks green<br>
+    <b>Tests</b> 206 passing (./tools/validate) · was 197 at the start of this lane<br>
+    <b>Measured</b> against the running app at a true 390px viewport — 71 tap targets,
+    all four tabs, safe areas simulated at iPhone 15 values<br>
     <b>Full detail</b> docs/overnight/proposals/sms-ux.md
   </footer>
 
@@ -628,6 +724,10 @@ BOARD_INIT = """
 
 
 def main():
+    # Only used in the "wrote …" line now. Commit hashes in the board are
+    # literals, because each proposal names the commit that SHIPPED it and
+    # HEAD moves on to the next cycle — templating them made SMS-1's line
+    # start claiming a commit it had nothing to do with.
     head = subprocess_hash()
     # Order matters twice over:
     #  - BOARD_CSS before calendar.css, because `.board h1` and
@@ -644,18 +744,19 @@ def main():
         # headless smoke test before this line existed). A duplicate
         # charset meta in the wrapper is harmless.
         '<meta charset="utf-8">',
-        "<title>Sports hub — the calendar, two ways</title>",
+        "<title>Sports hub — the review board</title>",
         "<style>",
         read("fonts.css"),
         BOARD_CSS,
         read("calendar.css"),
         "</style>",
         (BOARD_HTML
-            .replace("__HASH__", head)
             .replace("__SHOT_BEFORE__", shot_uri("audit-home-390.png"))
             .replace("__SHOT_AFTER__", shot_uri("sms-2-home-nextup-after.png"))
             .replace("__SHOT_CAL__", shot_uri("sms-3-calendar-390.png"))
-            .replace("__SHOT_DESK__", shot_uri("sms-3-calendar-desktop.png"))),
+            .replace("__SHOT_DESK__", shot_uri("sms-3-calendar-desktop.png"))
+            .replace("__SHOT_CHROME_BEFORE__", shot_uri("sms-4-chrome-before.png"))
+            .replace("__SHOT_CHROME_AFTER__", shot_uri("sms-4-chrome-after.png"))),
         "<script>",
         read("data.js"),
         "</script>",

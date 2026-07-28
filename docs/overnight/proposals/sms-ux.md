@@ -7,8 +7,12 @@ KEEP / DISCARD column is yours; I leave it blank. IDs are never renumbered or re
 **Review board (the phone-friendly version of this file):**
 <https://claude.ai/code/artifact/a1ac028b-0ea0-47bc-b52a-918e87ce2a65> — private,
 rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL is stable.
-**Branch:** `auto/overnight-sms-ux` — **all three KEPT by Dylan 2026-07-26 and merged to `master` locally (`--no-ff`). STILL NOT PUSHED: push is a Render deploy and is his hand only.**
-**Suite:** 197 passed (`./tools/validate`), green at every commit on this branch.
+**Branch:** SMS-1..SMS-3 came from `auto/overnight-sms-ux` — **all three KEPT by Dylan
+2026-07-26 and merged to `master` locally (`--no-ff`). STILL NOT PUSHED: push is a Render
+deploy and is his hand only.** SMS-4 onward are on `auto/lane-sms-jul27`, branched from
+that merge, and are **undecided**.
+**Suite:** 206 passed (`./tools/validate`), green at every commit. Baseline at the start of
+the Jul-27 lane was 197.
 
 ---
 
@@ -86,6 +90,40 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   keeping it means a deploy.
 - **KEEP / DISCARD** — **KEEP** (Dylan, 2026-07-26: "Keep all 3")
 
+### SMS-4 — The phone chrome stops hiding behind the notch
+
+- **WHAT** — Two fixes to the frame around every screen. **The notch:** when you
+  scroll, the HOME / CALENDAR / PLAYOFFS / TABLES row was sliding up behind the
+  iPhone's clock, and the bottom line of the footer was sitting under the home-bar.
+  Both now stop at the edge of the safe area instead. **Fingertips:** the three
+  filter chips (All / NFL / Soccer), the ‹ › month arrows, the Mark Watched button
+  and the "Full tables →" link were all shorter than a fingertip. All four are now
+  the standard size.
+- **WHY** — I measured the running app at a real phone width instead of reading the
+  code, and 16 of the 71 things you can tap were under the 44-pixel minimum the app's
+  own design notes already ask for. The notch half is worse than it sounds: the page
+  is deliberately set to run edge to edge under the notch — which is the right look —
+  but nothing in the styling ever gave that space back, so on a real iPhone, and
+  especially once it is added to your Home Screen, the tabs were genuinely unreadable
+  while scrolled. It has been that way since the Jul-22 deploy.
+- **WHERE** — `static/style.css` (four safe-area tokens + the tab bar, masthead,
+  footer and page edges that use them; four control sizes), new
+  `tests/test_phone_chrome.py` (9 tests), new `tools/qa-phone-chrome.py` +
+  `docs/overnight/mockups/qa-chrome.html`. Commit `667c6bb`. Pictures — the red
+  bands are the zones the iPhone reserves:
+  `docs/overnight/shots/sms-4-chrome-before.png` (tabs and footer text inside them)
+  → `sms-4-chrome-after.png` (both clear). Normal views:
+  `sms-4-home-390.png`, `sms-4-calendar-390.png`, and `sms-4-desktop.png` re-shot to
+  show desktop did not move.
+- **RISK** — I do not own an iPhone to check this on, and neither does the test: no
+  headless browser reports real notch measurements, so the harness feeds it fake ones
+  and proves the layout *responds*. That is strong evidence the wiring is right and
+  weak evidence about the exact look on your handset — the one thing worth eyeballing
+  after a deploy. The taller chips also cost about 10 pixels of vertical space at the
+  top of every screen, which is a real trade against a slightly larger target. And
+  like SMS-2 and SMS-3 this is live code: keeping it means a deploy.
+- **KEEP / DISCARD** —
+
 ---
 
 ## Idea queue
@@ -97,8 +135,8 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
    front page's designed centrepiece — renders nothing at all when there are no games
    today, so the page has no headline for weeks at a time. Promoting the next fixture
    into that slot is a taste call, so it would ship as mockups.
-3. Phone chrome pass — sticky tabs, safe-area/notch, tap-target sizes. Owed since the
-   Jul-22 deploy.
+3. ~~Phone chrome pass — sticky tabs, safe-area/notch, tap-target sizes~~ →
+   **CYCLE 4, shipped as SMS-4. CLOSED.**
 4. Game-card density at 390px — how much fits before it stops being glanceable.
 
 ## Cycle log
@@ -128,6 +166,21 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
   New `tools/qa-phone-calendar.py` proxies the app and the harness through one origin so
   the running app can be pinned to a true 390px *and* measured into; 9 asserts green,
   including a real click that moves the real list.
+- **CYCLE 4 — phone chrome pass — SHIPPED `667c6bb`.** Resumed 2026-07-27 on branch
+  `auto/lane-sms-jul27`. Two things are worth remembering from it:
+  (a) the safe-area defect was **invisible to every check the repo had** — the app
+  renders perfectly in a desktop browser and in headless Chrome, because headless
+  Chrome always reports 0px for `env(safe-area-inset-*)`. The fix for that is the
+  reason the insets became named `--sa-*` tokens instead of inline `env()`: the
+  harness can override the tokens and measure that the chrome moved. A layout that
+  ignores the notch does not move at all, and that difference is the assert;
+  (b) the first version of the new pytest guards asserted the *property* that carried
+  the offset (`.tab-bar { top }`), which would have gone red the moment someone solved
+  it a different way. Rewritten to assert where things land — and separately verified
+  by checking out the pre-fix stylesheet and confirming 7 of the 9 fail against it,
+  because a guard that passes on the broken version guards nothing.
+  Also fixed mid-cycle: the tap-target regex matched `line-height: 1` and reported a
+  40px arrow as "1". 197 → 206 tests.
 - ~~PAUSED~~ **RESUMED and paused again after cycle 3, 2026-07-26.** Original note:
   **PAUSED at a clean cycle boundary, 2026-07-26 evening.** Not a STOPPING line — the queue
   is not empty and the lane can resume at idea 3 (phone chrome pass) whenever it is picked
