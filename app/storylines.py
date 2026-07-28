@@ -108,6 +108,13 @@ def get_active_storylines():
             "id": sl["id"],
             "label": sl["label"],
             "description": sl.get("description", ""),
+            # Carried so the Front Page can tell a storyline apart from a
+            # title-race card covering the same competition. It used to work
+            # that out by scanning the LOADED games for one tagged with this
+            # storyline — which finds nothing in the off-season, when no
+            # Premier League game is in the window, so the dedupe silently
+            # stopped and the rail showed two cards for one story.
+            "leagues": list(sl.get("leagues") or []),
         }
         if sl.get("logo_url"):
             entry["logo_url"] = sl["logo_url"]

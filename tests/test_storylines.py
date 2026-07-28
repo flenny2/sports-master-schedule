@@ -147,7 +147,13 @@ def test_get_active_storylines_filters_inactive(monkeypatch):
 
 
 def test_get_active_storylines_shape(monkeypatch):
-    """Response shape should expose id, label, description."""
+    """Response shape should expose id, label, description and leagues.
+
+    `leagues` is what lets the Front Page tell this storyline apart from a
+    title-race card covering the same competition. It is always present —
+    an empty list when the storyline names none — so the client never has to
+    distinguish "no leagues" from "an older server that did not send them".
+    """
     monkeypatch.setattr(config, "STORYLINES", [
         {
             "id": "pl", "label": "PL Title Race",
@@ -160,7 +166,20 @@ def test_get_active_storylines_shape(monkeypatch):
         "id": "pl",
         "label": "PL Title Race",
         "description": "Arsenal vs Man City",
+        "leagues": [],
     }]
+
+
+def test_get_active_storylines_carries_configured_leagues(monkeypatch):
+    """The Front Page dedupe used to derive this by scanning the loaded
+    games, which finds nothing in the off-season — no Premier League game is
+    in the window — so it silently stopped deduping and the rail showed two
+    cards for the same race."""
+    monkeypatch.setattr(config, "STORYLINES", [
+        {"id": "pl", "label": "PL", "active": True,
+         "team_ids": ["359"], "leagues": ["eng.1"]},
+    ])
+    assert get_active_storylines()[0]["leagues"] == ["eng.1"]
 
 
 def test_get_active_storylines_hides_expired_chip(monkeypatch):

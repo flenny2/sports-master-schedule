@@ -691,16 +691,34 @@ function buildStoryBlock(games) {
     });
 
     storylinesData.forEach(function(sl) {
-        // Skip a storyline whose games live in a league already covered
-        // by a title-race card (avoids near-duplicate cards).
-        var slLeague = findStorylineLeague(sl.id, games);
-        if (slLeague && raceLeagues[slLeague]) return;
+        // Skip a storyline whose league is already covered by a title-race
+        // card (avoids near-duplicate cards). The storyline's CONFIGURED
+        // leagues decide this, not the loaded games: deriving it from the
+        // games was the old way, and it quietly stopped working in the
+        // off-season, when the window holds no Premier League fixture to
+        // derive from — so the rail showed two cards for the same race.
+        // The game scan stays as the fallback for a storyline that names
+        // no leagues, where the games are the only evidence there is.
+        if (storylineCoveredByRace(sl, games, raceLeagues)) return;
         list.appendChild(buildStorylineCard(sl, games));
     });
 
     if (!list.children.length) return null;
     block.appendChild(list);
     return block;
+}
+
+/** True when a title-race card already covers this storyline's competition */
+function storylineCoveredByRace(sl, games, raceLeagues) {
+    var configured = sl.leagues || [];
+    if (configured.length) {
+        for (var i = 0; i < configured.length; i++) {
+            if (raceLeagues[configured[i]]) return true;
+        }
+        return false;
+    }
+    var derived = findStorylineLeague(sl.id, games);
+    return !!(derived && raceLeagues[derived]);
 }
 
 /** League slug of the first game tagged with this storyline, or null */
