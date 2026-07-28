@@ -11,7 +11,7 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
 2026-07-26 and merged to `master` locally (`--no-ff`). STILL NOT PUSHED: push is a Render
 deploy and is his hand only.** SMS-4 onward are on `auto/lane-sms-jul27`, branched from
 that merge, and are **undecided**.
-**Suite:** 249 passed (`./tools/validate`), green at every commit. Baseline at the start of
+**Suite:** 251 passed (`./tools/validate`), green at every commit. Baseline at the start of
 the Jul-27 lane was 197.
 **Receipts:** every entry from SMS-4 on ends with a `RECEIPTS` line (run-law rule 14) so a
 read-only audit can verify this run without a live reviewer seat.
@@ -211,6 +211,28 @@ read-only audit can verify this run without a live reviewer seat.
 - **KEEP / DISCARD** —
 - **RECEIPTS** — suite 249 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · both storyline tests verified to fail against the old config
 
+### SMS-8 — The big card wraps a long team name instead of cutting it
+
+- **WHAT** — On the banner card at the top of Home, "CAROLINA PANTHERS" was being
+  cut to "CAROLINA PANTHE…". It now wraps onto two lines and shows the whole name.
+  The ordinary cards in the Calendar list are unchanged, on purpose.
+- **WHY** — I measured every card the app draws at phone width, both closed and
+  opened: **nothing is being cut** — 19 cards, zero losses. The one place text was
+  disappearing is the big banner card, where the team name is set larger. It was
+  short by six pixels.
+- **WHERE** — `static/style.css` (one rule), two tests, and a new measuring tool
+  `tools/qa-phone-cards.py`. Commit `612fff0`. The wrapped banner is visible in the
+  re-shot `docs/overnight/shots/sms-5-headline-a-nextgame.png`; an opened card at
+  phone width is `sms-8-card-expanded-390.png`.
+- **RISK** — A two-line name makes the banner taller, and if the two teams have
+  names of different lengths the card is slightly lopsided. I chose wrapping over a
+  smaller font because six pixels would have fixed those two names and still failed
+  on something like "Wolverhampton Wanderers" — but if you would rather the banner
+  stayed one line at any cost, that is a one-line revert. Past two lines the "…"
+  comes back, so the card cannot grow forever.
+- **KEEP / DISCARD** —
+- **RECEIPTS** — suite 251 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · measured against the running app at a true 390px; desktop re-rendered at 1100px unchanged
+
 ---
 
 ## Idea queue
@@ -221,9 +243,12 @@ read-only audit can verify this run without a live reviewer seat.
    MAIN EVENT marquee~~ → **CYCLE 5, shipped as SMS-5 (two mockups). Parked on Dylan.**
 3. ~~Phone chrome pass — sticky tabs, safe-area/notch, tap-target sizes~~ →
    **CYCLE 4, shipped as SMS-4. CLOSED.**
-4. Game-card density at 390px — how much fits before it stops being glanceable.
-   (The SMS-5 shot already gave this one evidence: at marquee size a full team name
-   truncates to "CAROLINA PANTHE…" on a 390px phone.)
+4. ~~Game-card density at 390px~~ → **CYCLE 8, shipped as SMS-8.** Answer: ordinary
+   cards lose nothing at 390px; only the banner did, and it now wraps.
+8. **Two cards for one story on the Front Page** — found while shipping SMS-8, not yet
+   fixed. The rail shows the title-race card AND a storyline card for the same Premier
+   League race. The dedupe exists but works out the storyline's league by scanning the
+   loaded games, and in the off-season none are loaded. Next cycle.
 5. ~~The season-rollover checklist goes stale silently every August~~ → **CYCLE 6,
    shipped as SMS-6.** The checklist is a command now, and the one real bug in it (the
    hardcoded 38-match season) is fixed. What it found is the next cycle's work.
@@ -316,6 +341,25 @@ read-only audit can verify this run without a live reviewer seat.
   predecessor deliberately did not: that omission was safe when 25-26 was the only
   season the app had seen, and would now back-tag every Arsenal–City match from last
   season with a 26-27 chip. 246 → 249 tests.
+- **CYCLE 8 — game-card density at 390px — SHIPPED `612fff0`.** The measurement was
+  the point and it half-cleared the idea: **ordinary cards lose nothing** — 19 cards,
+  collapsed and expanded, zero text cut. Only the banner did, by six pixels. Two things
+  had to be right for the harness to find it, and the first version got both wrong.
+  It must measure the **worst name in the data**, not the first game — a card reading
+  "COD" and "ENG" fits at any size and answers nothing. And it must measure **both card
+  layouts**: a finished game renders a scoreboard (name beside a two-digit score) while
+  an upcoming one renders name-beside-kickoff-time, with far less room. Measuring only
+  the finished layout reported "fits" and was wrong, because the loaded July window is
+  all completed World Cup matches. The fix is a **wrap, not a smaller font** — six
+  pixels would have fixed those two names and still failed on "Wolverhampton Wanderers".
+  Also extracted `tools/phone_harness.py`: three drivers had each pasted the same
+  one-origin proxy and a fourth was about to; all three re-run green after.
+  249 → 251 tests.
+- **FOUND, NOT YET FIXED (next cycle):** renewing the storyline in SMS-7 put **two
+  cards for the same story** on the Front Page rail — the title-race card and a
+  storyline card. The dedupe exists but derives the storyline's league by scanning the
+  LOADED games, and in the off-season no Premier League game is loaded, so it finds
+  nothing and skips nothing. Visible in `sms-5-headline-a-nextgame.png`.
 - **Run status, 2026-07-27: OPEN-ENDED on Dylan's direct word** (lane-kickoffs rule 10) —
   finishing the chartered job is not the end. Ends only on his word here, a
   `STOP-THE-RUN` line at the top of this file, or a fence that needs him.
