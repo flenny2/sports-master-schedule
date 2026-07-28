@@ -151,6 +151,34 @@ the Jul-27 lane was 197.
   where shipping is a deploy.
 - **KEEP / DISCARD** —
 
+### SMS-6 — The August checklist now runs itself, and one real bug in it is fixed
+
+- **WHAT** — Two things. **The bug:** the title-race widget worked out "matches
+  left" by assuming every league plays 38, which is true of the Premier League and
+  wrong for the Bundesliga and Ligue 1 — a race in either would have shown four
+  matches, twelve points, of "still winnable" that do not exist. It now works the
+  number out from the size of the table instead, so it is right for any league.
+  **The checklist:** there is a list in the repo of five settings that quietly go
+  out of date every August. It was a note for a human to remember. It is now a
+  command — `./tools/rollover-check` — and the test run prints a one-line summary
+  of it every time, so nobody has to remember.
+- **WHY** — August is ten days away and this list has never been walked. Running it
+  for the first time found the Premier League storyline expired on 31 May, which is
+  why the Calendar has no storyline filter at all right now. Nothing crashed and
+  nothing looked broken — that is exactly the failure mode the list warns about.
+- **WHERE** — New `app/rollover.py` + `tools/rollover-check`, a summary line in
+  `tools/validate`, the season-length fix in `app/espn.py`, three lines in
+  `static/app.js`. Commit `2a4ddbb`. 206 → 246 tests.
+- **RISK** — The summary prints but never fails the test run, on purpose: what it
+  catches are choices only you can make, and a failing suite would block every
+  future session on your say-so. The trade is that a printed warning can be
+  scrolled past. The season-length fix assumes a normal home-and-away league; a
+  split season like the Scottish Premiership would be wrong in the same direction
+  the old number was, which is written down at the code. And the checker is honest
+  about its limits — it cannot tell a year-old title race from a current one, so it
+  asks rather than guessing.
+- **KEEP / DISCARD** —
+
 ---
 
 ## Idea queue
@@ -164,12 +192,16 @@ the Jul-27 lane was 197.
 4. Game-card density at 390px — how much fits before it stops being glanceable.
    (The SMS-5 shot already gave this one evidence: at marquee size a full team name
    truncates to "CAROLINA PANTHE…" on a 390px phone.)
-5. The season-rollover checklist in `CLAUDE.md` names five config artifacts that go
-   stale silently every August — and it is August in ten days. One of them, the
-   `STORYLINES` entry, is ALREADY expired (the 25-26 PL entry ended 31 May), so the
-   Calendar has no storyline filter at all right now.
-6. `NBA_NATIONAL_NETWORKS` is documented dead code whose comment describes coverage no
-   code path provides — the checklist says "decide, then act" and nobody has.
+5. ~~The season-rollover checklist goes stale silently every August~~ → **CYCLE 6,
+   shipped as SMS-6.** The checklist is a command now, and the one real bug in it (the
+   hardcoded 38-match season) is fixed. What it found is the next cycle's work.
+6. **Act on the two STALE items the checker reports** — the expired PL storyline (the
+   Calendar has no filter) and `NBA_NATIONAL_NETWORKS` (defined, used by nothing).
+   Deliberately NOT folded into SMS-6 so the mechanism can be kept and the content
+   changes discarded separately.
+7. The three `needs-you` items the checker asks about — title-race contenders for the
+   new season, the primetime network set against the 26-27 rights deals, the fantasy
+   roster after the late-August draft. All Dylan's; the checker's job is only to ask.
 
 ## Cycle log
 
@@ -226,6 +258,20 @@ the Jul-27 lane was 197.
   precondition both variants need. Also learned: variant B needs **no new endpoint** —
   the Premier League's 21 August restart is nowhere near the loaded month, but the page
   already knows it from the title race's `upcoming` list.
+- **CYCLE 6 — the August rollover made visible + the 38-match bug — SHIPPED `2a4ddbb`.**
+  Picked over the remaining polish ideas because it is the only dated item in the repo:
+  the checklist is due in ten days and had never been walked. Three judgements worth
+  keeping: (a) the season length is **derived from the standings table's own size**
+  rather than a per-league map — a map fixes today's leagues and then goes stale
+  exactly like everything else on the checklist, and the table already knows how many
+  teams are in it; (b) where the size is not a league at all the helper returns None
+  and the widget drops the figure, because inventing one is precisely what the old
+  constant did; (c) the checker's `stale` / `needs-you` split is the whole design — one
+  a session may act on unasked, the other only Dylan can answer, and blurring them
+  turns the output into a nag list, which is how the prose version went unread for two
+  months. Advisory, never fatal: a red suite would block every future session on a
+  config choice that is his. Verified the new tests fail 15/17 against the old
+  constant. 206 → 246 tests.
 - **Run status, 2026-07-27: OPEN-ENDED on Dylan's direct word** (lane-kickoffs rule 10) —
   finishing the chartered job is not the end. Ends only on his word here, a
   `STOP-THE-RUN` line at the top of this file, or a fence that needs him.

@@ -301,6 +301,15 @@ BOARD_CSS = """
 .prop-title { font-family: var(--f-disp); font-weight: 700; font-size: 1.2rem;
               letter-spacing: 0.03em; text-transform: uppercase; }
 .prop dl { margin: 0; padding: 16px 18px 18px; display: grid; gap: 12px; }
+/* A grid item defaults to min-width:auto, so anything with a wide intrinsic
+   size — the .term block below, a long unbroken code span — widens the whole
+   column. And because `.prop` above sets overflow:hidden for its rounded
+   corners, the result is not a sideways scrollbar you would notice: the card
+   silently CUTS the text instead. Measured at 390px without this line,
+   2026-07-27: `article.prop cuts 208px`, i.e. half of every sentence in the
+   SMS-6 entry was gone, while the page still reported a clean 390px width.
+   tools/shoot-review-board.py asserts it so it cannot come back quietly. */
+.prop dl > div { min-width: 0; }
 .prop dt {
   font-family: var(--f-mono);
   font-size: 0.63rem;
@@ -319,6 +328,21 @@ BOARD_CSS = """
 }
 .risk dd { color: var(--risk); }
 .verdict dd { color: var(--txt-2); font-style: italic; }
+
+/* Terminal output, quoted verbatim. Scrolls in its own box rather than
+   wrapping — a wrapped column report stops being a column report — and the
+   page body never scrolls sideways because of it. */
+.term {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--desk-3);
+  border-radius: 6px;
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
+}
 
 /* Triage bands. A flat list of proposals is what makes review slow, so each
    one sits under the heading that says how hard the call is. The label is a
@@ -373,13 +397,15 @@ BOARD_HTML = """
 
   <header class="head">
     <div class="eyebrow">Sports hub · lane · Mon 27 Jul 2026</div>
-    <h1>The phone frame,<br>and the empty headline</h1>
+    <h1>Three to rule on,<br>one to deploy</h1>
     <p class="lede">
-      Two new things to decide. <b>SMS-4</b> — on a real iPhone the tab row was sliding
+      Three new things to decide. <b>SMS-4</b> — on a real iPhone the tab row was sliding
       up behind the clock as you scrolled, and a third of the things you can tap were
-      smaller than a fingertip; both fixed and measured. <b>SMS-5</b> — the big banner at
-      the top of Home draws nothing at all out of season, so here are two things that
-      could fill it, built rather than guessed at.
+      smaller than a fingertip; both fixed and measured. <b>SMS-6</b> — the list of
+      settings that quietly go out of date every August is a command now instead of a
+      note, and the one real bug on it is fixed. <b>SMS-5</b> — the big banner at the top
+      of Home draws nothing at all out of season, so here are two things that could fill
+      it, built rather than guessed at.
     </p>
     <p class="muted">
       SMS-1, SMS-2 and SMS-3 are the calendar work you already kept on 26 July. They are
@@ -389,10 +415,10 @@ BOARD_HTML = """
 
   <section class="decide">
     <h2>What is still owed by you</h2>
-    <p><b>Three things, and they are separate.</b></p>
+    <p><b>Four things, and they are separate.</b></p>
 
     <div class="opt">
-      <span class="opt-name">1 · Keep or discard SMS-4</span>
+      <span class="opt-name">1 · Keep or discard SMS-4 and SMS-6</span>
       <span class="muted">Reply with the ID. The full case is below, with a picture of the
       before and after.</span>
     </div>
@@ -413,7 +439,7 @@ BOARD_HTML = """
       <br><br>
       <code class="cmd">git push origin master</code>
       <br>
-      SMS-4 and SMS-5 are <b>not</b> in that push — they sit on the branch
+      SMS-4, SMS-5 and SMS-6 are <b>not</b> in that push — they sit on the branch
       <code>auto/lane-sms-jul27</code> until you rule on them.
     </div>
   </section>
@@ -421,13 +447,13 @@ BOARD_HTML = """
   <section style="display:flex;flex-direction:column;gap:16px">
     <h2>The proposals</h2>
     <p class="muted">
-      Reply with IDs — "keep SMS-4, SMS-5 is B" — and the next session does exactly that.
+      Reply with IDs — "keep SMS-4 and SMS-6, SMS-5 is B" — and the next session does exactly that.
       IDs are never reused, so they stay valid forever.
     </p>
 
     <div class="band">
       <span class="band-name">Obvious keep</span>
-      <span class="band-note">a defect fixed, no taste call in it</span>
+      <span class="band-note">defects fixed, no taste call in them</span>
     </div>
 
     <article class="prop">
@@ -487,6 +513,78 @@ BOARD_HTML = """
           worth eyeballing after a deploy. The taller chips also cost about 10 pixels of
           vertical space at the top of every screen — a real trade against a bigger target.
           Live code: keeping it means a deploy.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
+      </dl>
+    </article>
+
+    <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-6</span>
+        <span class="prop-title">The August checklist runs itself now</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          Two things. <b>A real bug:</b> the title-race widget worked out "matches
+          left" by assuming every league plays 38 — true of the Premier League, wrong
+          for the Bundesliga and Ligue 1, where it would have shown twelve points of
+          "still winnable" that do not exist. It now works the number out from the
+          size of the table, so it is right for any league.
+          <b>The checklist:</b> there is a list in the repo of five settings that
+          quietly go out of date every August. It was a note for a human to remember.
+          It is now a command, and the test run prints a one-line summary of it every
+          time.
+        </dd></div>
+        <div><dt>What it says today</dt><dd>
+          <!-- Re-wrapped narrow rather than quoted in the tool's own column
+               layout: the columns need ~90 characters, and a phone gets ~40.
+               Quoting it verbatim meant the detail — the part that says what
+               is actually wrong — sat off-screen inside a scroll box. -->
+          <pre class="term">$ ./tools/rollover-check
+
+STALE  STORYLINES
+       every active storyline has expired
+       (PL Title Race ended 2026-05-31), so
+       the Calendar has no storyline filter
+
+STALE  NBA_NATIONAL_NETWORKS
+       defined, used by nothing
+
+you    TITLE_RACES
+       are these THIS season's contenders?
+
+you    NFL_PRIMETIME_NETWORKS
+       Friday games are included ONLY via
+       this set — recheck the rights deals
+
+you    FANTASY_ROSTER
+       empty until the LPPC draft (late Aug)</pre>
+          <p class="muted" style="margin-top:8px">
+            <b>STALE</b> means a date has passed or a value is empty — no judgement,
+            a session can just fix it. <b>you</b> means a call only you can make, and
+            the checker's whole job there is to ask at the right time of year rather
+            than guess. Acting on the two stale ones is the next thing I do; it is
+            kept separate so you can keep this and still discard those.
+          </p>
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          August is ten days away and that list had never been walked. Running it for
+          the first time is what turned up the expired Premier League storyline — which
+          is why the Calendar has no storyline filter right now. Nothing crashed and
+          nothing looked broken, which is exactly the failure the list warns about.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          New <code>app/rollover.py</code> and <code>tools/rollover-check</code>, a
+          summary line in <code>tools/validate</code>, the season-length fix in
+          <code>app/espn.py</code>. Commit <code>2a4ddbb</code>. 206 → 246 tests.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          The summary prints but never fails the test run, on purpose — what it catches
+          are choices only you can make, and a failing suite would block every future
+          session waiting on you. The trade is that a printed warning can be scrolled
+          past. The season-length fix assumes a normal home-and-away league; a split
+          season like the Scottish Premiership would be wrong in the same direction the
+          old number was, which is written down at the code.
         </dd></div>
         <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
       </dl>
@@ -756,10 +854,10 @@ BOARD_HTML = """
   </section>
 
   <footer class="foot">
-    <b>Branch</b> auto/lane-sms-jul27 (SMS-4 and SMS-5, both undecided) · off master,
+    <b>Branch</b> auto/lane-sms-jul27 (SMS-4, SMS-5, SMS-6 — all undecided) · off master,
     which carries SMS-1..3 merged and <b>never pushed</b><br>
     <b>Deploy</b> untouched — pushing this repo is a deploy and only ever your hand<br>
-    <b>Tests</b> 206 passing (./tools/validate) · was 197 at the start of this lane<br>
+    <b>Tests</b> 246 passing (./tools/validate) · was 197 at the start of this lane<br>
     <b>Measured</b> against the running app at a true 390px viewport — 71 tap targets,
     all four tabs, safe areas simulated at iPhone 15 values<br>
     <b>Full detail</b> docs/overnight/proposals/sms-ux.md
