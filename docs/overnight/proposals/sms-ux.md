@@ -11,8 +11,10 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
 2026-07-26 and merged to `master` locally (`--no-ff`). STILL NOT PUSHED: push is a Render
 deploy and is his hand only.** SMS-4 onward are on `auto/lane-sms-jul27`, branched from
 that merge, and are **undecided**.
-**Suite:** 206 passed (`./tools/validate`), green at every commit. Baseline at the start of
+**Suite:** 249 passed (`./tools/validate`), green at every commit. Baseline at the start of
 the Jul-27 lane was 197.
+**Receipts:** every entry from SMS-4 on ends with a `RECEIPTS` line (run-law rule 14) so a
+read-only audit can verify this run without a live reviewer seat.
 
 ---
 
@@ -123,6 +125,7 @@ the Jul-27 lane was 197.
   top of every screen, which is a real trade against a slightly larger target. And
   like SMS-2 and SMS-3 this is live code: keeping it means a deploy.
 - **KEEP / DISCARD** —
+- **RECEIPTS** — suite 206 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · phone chrome measured live at 390px; desktop re-shot unchanged
 
 ### SMS-5 — Something to headline the Home page out of season, built twice
 
@@ -150,6 +153,7 @@ the Jul-27 lane was 197.
   mockups: choosing one is then a real change to the page you open most, on a repo
   where shipping is a deploy.
 - **KEEP / DISCARD** —
+- **RECEIPTS** — suite 206 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · mockups only — no file the app loads was touched
 
 ### SMS-6 — The August checklist now runs itself, and one real bug in it is fixed
 
@@ -178,6 +182,7 @@ the Jul-27 lane was 197.
   about its limits — it cannot tell a year-old title race from a current one, so it
   asks rather than guessing.
 - **KEEP / DISCARD** —
+- **RECEIPTS** — suite 246 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · new tests verified to fail 15/17 against the old constant
 
 ### SMS-7 — The Calendar has its storyline filter back
 
@@ -204,6 +209,7 @@ the Jul-27 lane was 197.
   Deleting the NBA setting is only awkward if NBA comes back, and a comment in its
   place says where the old values live. Live code: keeping it means a deploy.
 - **KEEP / DISCARD** —
+- **RECEIPTS** — suite 249 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · both storyline tests verified to fail against the old config
 
 ---
 
@@ -313,6 +319,13 @@ the Jul-27 lane was 197.
 - **Run status, 2026-07-27: OPEN-ENDED on Dylan's direct word** (lane-kickoffs rule 10) —
   finishing the chartered job is not the end. Ends only on his word here, a
   `STOP-THE-RUN` line at the top of this file, or a fence that needs him.
+  **Run-law rules 11–15 arrived mid-run** (meta `4baee52`) and are in force from cycle 7:
+  re-read this file's top and the charter at every cycle start and wakeup, because
+  `STOP-THE-RUN` is the fleet's only phone-reachable kill switch and it only works if a
+  lane actually looks (11) · a dry queue **downshifts and files a proposal saying so**
+  rather than inventing work, because Dylan's review minutes are the scarce resource (12)
+  · verdicts get stamped back into THIS file when he rules (13) · every entry carries a
+  `RECEIPTS` line — added retroactively to SMS-4..SMS-7 (14) · no machinery, ever (15).
 - ~~PAUSED~~ **RESUMED and paused again after cycle 3, 2026-07-26.** Original note:
   **PAUSED at a clean cycle boundary, 2026-07-26 evening.** Not a STOPPING line — the queue
   is not empty and the lane can resume at idea 3 (phone chrome pass) whenever it is picked
