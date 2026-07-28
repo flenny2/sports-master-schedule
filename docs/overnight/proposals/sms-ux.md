@@ -124,20 +124,52 @@ the Jul-27 lane was 197.
   like SMS-2 and SMS-3 this is live code: keeping it means a deploy.
 - **KEEP / DISCARD** —
 
+### SMS-5 — Something to headline the Home page out of season, built twice
+
+- **WHAT** — The big banner slot at the top of Home is empty right now and stays
+  empty until the season starts. Two things that could fill it, so you pick.
+  **A (next game):** the next fixture becomes the big card — full size, team
+  colours, "Kicks off in 9d 23h" under it — so the page looks the same in August
+  as it does in October. **B (countdown board):** instead of one game, a short
+  board of when each of your competitions starts — *NFL · Thu Aug 6 · 10 days* /
+  *Premier League · Fri Aug 21 · 25 days*. Nothing in the app changed either way.
+- **WHY** — The banner is the front page's designed centrepiece, and on a day with
+  no games it renders nothing at all, which is why Home currently starts with the
+  Your Teams strip and then a small "next up" line. That is weeks of the page having
+  no headline. Which of the two is right is a taste question, so both are built.
+- **WHERE** — `docs/overnight/mockups/headline-variants.html` +
+  `tools/shoot-headline-mockups.py`. Commit `ffe2f1b`. Shots:
+  `docs/overnight/shots/sms-5-headline-a-nextgame.png` and
+  `sms-5-headline-b-countdown.png`. **No file the app loads was touched.**
+- **RISK** — A puts a game that is ten days away at the same visual weight as a
+  kickoff happening now, which may read as louder than it deserves; the shot also
+  shows the cost of that size at 390px — "CAROLINA PANTHE…" truncates, where the
+  small card fits "CAR". B is quieter and always honest, but on a normal Saturday
+  it would have nothing to say, so B is really a *second* state the page needs
+  rather than a replacement — that is the part I would want your read on. Both are
+  mockups: choosing one is then a real change to the page you open most, on a repo
+  where shipping is a deploy.
+- **KEEP / DISCARD** —
+
 ---
 
 ## Idea queue
 
 1. ~~§mobile-month-calendar~~ → **CYCLE 1 (mockups, SMS-1) → Dylan picked B →
    CYCLE 3 built it for real (SMS-3). CLOSED.**
-2. ~~Off-season Home audit~~ → **CYCLE 2, shipped as SMS-2.** The audit found one real
-   defect and it is fixed. Still open from the same look: the MAIN EVENT marquee — the
-   front page's designed centrepiece — renders nothing at all when there are no games
-   today, so the page has no headline for weeks at a time. Promoting the next fixture
-   into that slot is a taste call, so it would ship as mockups.
+2. ~~Off-season Home audit~~ → **CYCLE 2, shipped as SMS-2.** ~~Still open: the empty
+   MAIN EVENT marquee~~ → **CYCLE 5, shipped as SMS-5 (two mockups). Parked on Dylan.**
 3. ~~Phone chrome pass — sticky tabs, safe-area/notch, tap-target sizes~~ →
    **CYCLE 4, shipped as SMS-4. CLOSED.**
 4. Game-card density at 390px — how much fits before it stops being glanceable.
+   (The SMS-5 shot already gave this one evidence: at marquee size a full team name
+   truncates to "CAROLINA PANTHE…" on a 390px phone.)
+5. The season-rollover checklist in `CLAUDE.md` names five config artifacts that go
+   stale silently every August — and it is August in ten days. One of them, the
+   `STORYLINES` entry, is ALREADY expired (the 25-26 PL entry ended 31 May), so the
+   Calendar has no storyline filter at all right now.
+6. `NBA_NATIONAL_NETWORKS` is documented dead code whose comment describes coverage no
+   code path provides — the checklist says "decide, then act" and nobody has.
 
 ## Cycle log
 
@@ -181,6 +213,22 @@ the Jul-27 lane was 197.
   because a guard that passes on the broken version guards nothing.
   Also fixed mid-cycle: the tap-target regex matched `line-height: 1` and reported a
   40px arrow as "1". 197 → 206 tests.
+- **CYCLE 5 — the empty headline slot, built twice — SHIPPED `ffe2f1b`.** The taste call
+  went to Dylan as two mockups rather than a guess (lane rule 5). The method changed from
+  cycle 1 deliberately: instead of re-drawing the front page in a parallel stylesheet,
+  each variant is a **transformation of the running app** — the harness calls the app's
+  own `buildCard()`/`el()` with the app's own data, so the shots cannot drift from what
+  shipping would look like. Cycle 1's mockup drifted exactly that way (Sunday-first
+  weekday headers the app never had), and this removes the whole class of that mistake.
+  One harness bug fixed on the way and worth remembering: waiting on `.fp-slate` raced the
+  schedule fetch, so variant A failed on a cold cache while B passed on a warm one — same
+  page, same code, different second. It now waits for the "next up" card, which IS the
+  precondition both variants need. Also learned: variant B needs **no new endpoint** —
+  the Premier League's 21 August restart is nowhere near the loaded month, but the page
+  already knows it from the title race's `upcoming` list.
+- **Run status, 2026-07-27: OPEN-ENDED on Dylan's direct word** (lane-kickoffs rule 10) —
+  finishing the chartered job is not the end. Ends only on his word here, a
+  `STOP-THE-RUN` line at the top of this file, or a fence that needs him.
 - ~~PAUSED~~ **RESUMED and paused again after cycle 3, 2026-07-26.** Original note:
   **PAUSED at a clean cycle boundary, 2026-07-26 evening.** Not a STOPPING line — the queue
   is not empty and the lane can resume at idea 3 (phone chrome pass) whenever it is picked

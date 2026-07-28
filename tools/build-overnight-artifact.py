@@ -373,11 +373,13 @@ BOARD_HTML = """
 
   <header class="head">
     <div class="eyebrow">Sports hub · lane · Mon 27 Jul 2026</div>
-    <h1>The phone frame,<br>measured and fixed</h1>
+    <h1>The phone frame,<br>and the empty headline</h1>
     <p class="lede">
-      One new thing to decide: <b>SMS-4</b>. On a real iPhone the tab row was sliding up
-      behind the clock as you scrolled, and a third of the things you can tap were smaller
-      than a fingertip. Both are fixed, measured, and waiting on your word.
+      Two new things to decide. <b>SMS-4</b> — on a real iPhone the tab row was sliding
+      up behind the clock as you scrolled, and a third of the things you can tap were
+      smaller than a fingertip; both fixed and measured. <b>SMS-5</b> — the big banner at
+      the top of Home draws nothing at all out of season, so here are two things that
+      could fill it, built rather than guessed at.
     </p>
     <p class="muted">
       SMS-1, SMS-2 and SMS-3 are the calendar work you already kept on 26 July. They are
@@ -387,7 +389,7 @@ BOARD_HTML = """
 
   <section class="decide">
     <h2>What is still owed by you</h2>
-    <p><b>Two things, and they are separate.</b></p>
+    <p><b>Three things, and they are separate.</b></p>
 
     <div class="opt">
       <span class="opt-name">1 · Keep or discard SMS-4</span>
@@ -395,7 +397,12 @@ BOARD_HTML = """
       before and after.</span>
     </div>
     <div class="opt">
-      <span class="opt-name">2 · The deploy you already approved</span>
+      <span class="opt-name">2 · Pick A or B on SMS-5</span>
+      <span class="muted">Or say neither — "leave the banner empty out of season" is a
+      real answer and I would rather have it than a guess.</span>
+    </div>
+    <div class="opt">
+      <span class="opt-name">3 · The deploy you already approved</span>
       <span class="muted">SMS-1, SMS-2 and SMS-3 are merged onto <code>master</code> and
       have never been pushed, because pushing this repo is a deploy and that is only ever
       your hand.</span>
@@ -406,16 +413,16 @@ BOARD_HTML = """
       <br><br>
       <code class="cmd">git push origin master</code>
       <br>
-      SMS-4 is <b>not</b> in that push — it sits on the branch
-      <code>auto/lane-sms-jul27</code> until you say keep.
+      SMS-4 and SMS-5 are <b>not</b> in that push — they sit on the branch
+      <code>auto/lane-sms-jul27</code> until you rule on them.
     </div>
   </section>
 
   <section style="display:flex;flex-direction:column;gap:16px">
     <h2>The proposals</h2>
     <p class="muted">
-      Reply with IDs — "keep SMS-4", "discard SMS-4" — and the next session does exactly
-      that. IDs are never reused, so they stay valid forever.
+      Reply with IDs — "keep SMS-4, SMS-5 is B" — and the next session does exactly that.
+      IDs are never reused, so they stay valid forever.
     </p>
 
     <div class="band">
@@ -482,6 +489,68 @@ BOARD_HTML = """
           Live code: keeping it means a deploy.
         </dd></div>
         <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
+      </dl>
+    </article>
+
+    <div class="band">
+      <span class="band-name">Needs your taste</span>
+      <span class="band-note">two versions built; the pick is yours, not mine</span>
+    </div>
+
+    <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-5</span>
+        <span class="prop-title">Something to headline Home out of season</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          The big banner slot at the top of Home is empty right now, and stays empty
+          until the season starts. Two things that could fill it — pick one, or say
+          neither.
+        </dd></div>
+        <div><dt>The two</dt><dd>
+          <div class="ba tall-pair">
+            <figure>
+              <img class="shot" alt="Home page with the next fixture as a full-size banner card"
+                   src="__SHOT_HEAD_A__">
+              <figcaption>A · the next game IS the main event</figcaption>
+            </figure>
+            <figure>
+              <img class="shot" alt="Home page with a countdown board listing season openers"
+                   src="__SHOT_HEAD_B__">
+              <figcaption>B · a countdown board instead of a game</figcaption>
+            </figure>
+          </div>
+          <p class="muted" style="margin-top:10px">
+            <b>A</b> — the next fixture becomes the big card, team colours and all, with
+            "Kicks off in 9d 23h" under it, so the page looks the same in August as it
+            does in October. The small "next up" line goes away, because two cards for
+            one game reads as a bug.<br><br>
+            <b>B</b> — instead of one game, when each of your competitions starts:
+            NFL in 10 days, Premier League in 25. The "next up" line stays.
+          </p>
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          That banner is the front page's centrepiece, and on a day with no games it
+          draws nothing at all — which is why Home currently opens with Your Teams and
+          then a small line. Weeks of the page having no headline.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          <code>docs/overnight/mockups/headline-variants.html</code>, commit
+          <code>ffe2f1b</code>. <b>Nothing the app loads was touched</b> — but these are
+          not hand-drawn either: each one is the <i>running app</i> with the change
+          applied to it, so what you see is what shipping looks like.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          A gives a game ten days out the same weight as a kickoff happening now, which
+          may read louder than it deserves — and at phone size it costs you the team
+          name: the shot shows "CAROLINA PANTHE…" where the small card fits "CAR".
+          B is quieter and always honest, but on a normal Saturday it has nothing to
+          say, so B is really a <i>second</i> state the page needs rather than a
+          replacement for the banner. That is the part I would want your read on.
+          Choosing either is then a real change to the page you open most.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you — reply "A", "B", or "neither"</dd></div>
       </dl>
     </article>
 
@@ -674,19 +743,21 @@ BOARD_HTML = """
   <section style="display:flex;flex-direction:column;gap:12px">
     <h2>Next in the queue</h2>
     <ol class="list">
-      <li><b>The empty headline slot.</b> The front page's Main Event banner renders nothing
-        at all on a day with no games, so for weeks at a time the page has no headline.
-        Putting the next fixture there is a taste call, so it would come to you as
-        mockups.</li>
+      <li><b>August is in ten days, and five settings go stale in August.</b> The repo's
+        own rollover checklist says so, and one of them has <i>already</i> expired: the
+        Premier League storyline ended on 31 May, so the Calendar has no storyline filter
+        at all right now. Nothing breaks — the app just quietly shows the wrong thing.</li>
       <li><b>Game-card size on a phone.</b> How much fits before a card stops being
-        glanceable.</li>
+        glanceable. The SMS-5 shots already gave this evidence: at banner size a full
+        team name truncates to "CAROLINA PANTHE…" on your phone.</li>
     </ol>
-    <p class="muted">Done since the last board: the phone chrome pass, above as SMS-4.</p>
+    <p class="muted">Done since the last board: the phone chrome pass (SMS-4) and the two
+      headline mockups (SMS-5).</p>
   </section>
 
   <footer class="foot">
-    <b>Branch</b> auto/lane-sms-jul27 (SMS-4, undecided) · off master, which carries
-    SMS-1..3 merged and <b>never pushed</b><br>
+    <b>Branch</b> auto/lane-sms-jul27 (SMS-4 and SMS-5, both undecided) · off master,
+    which carries SMS-1..3 merged and <b>never pushed</b><br>
     <b>Deploy</b> untouched — pushing this repo is a deploy and only ever your hand<br>
     <b>Tests</b> 206 passing (./tools/validate) · was 197 at the start of this lane<br>
     <b>Measured</b> against the running app at a true 390px viewport — 71 tap targets,
@@ -755,6 +826,8 @@ def main():
             .replace("__SHOT_AFTER__", shot_uri("sms-2-home-nextup-after.png"))
             .replace("__SHOT_CAL__", shot_uri("sms-3-calendar-390.png"))
             .replace("__SHOT_DESK__", shot_uri("sms-3-calendar-desktop.png"))
+            .replace("__SHOT_HEAD_A__", shot_uri("sms-5-headline-a-nextgame.png"))
+            .replace("__SHOT_HEAD_B__", shot_uri("sms-5-headline-b-countdown.png"))
             .replace("__SHOT_CHROME_BEFORE__", shot_uri("sms-4-chrome-before.png"))
             .replace("__SHOT_CHROME_AFTER__", shot_uri("sms-4-chrome-after.png"))),
         "<script>",
