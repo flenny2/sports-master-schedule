@@ -1,3 +1,5 @@
+STOP-THE-RUN 2026-07-27 22:27 PDT — Dylan's word by phone, relayed by the meta desk (charter rule 11). Finish the cycle you are in, stop clean at the boundary, mark STOPPING: run end, then file your wrap block to meta-fable-supervisor/close-outs/ per the standing ferry contract — he is sitting down to review the work now.
+
 # Proposals — lane `sms-ux` (Opus 5, night of 2026-07-26)
 
 **How to use this file:** each entry has an ID (`SMS-1`, `SMS-2`…). Reply with IDs —
@@ -485,6 +487,15 @@ read-only audit can verify this run without a live reviewer seat.
   **Cadence: maintenance from here** — longest wake, and each wake re-reads this file's top,
   the charter, and TODOS before doing anything. Building resumes when he rules, or when
   something real turns up.
+- **STOPPING: run end — `STOP-THE-RUN 2026-07-27 22:27 PDT`** (Dylan's phone word,
+  desk-relayed). Read during the rule-11 re-read at the start of a MAINTENANCE wake, which
+  does no work by design — so there was no cycle to finish and nothing was picked up and
+  dropped. The last commit before the stop is `22878a2`; the only uncommitted thing in the
+  tree was the desk's own stop line, now committed alongside this entry so the question and
+  the answer sit together in git.
+  **Final state: 8 cycles, 8 proposals (SMS-4..SMS-11), 197 → 254 tests, `./tools/validate`
+  PASS at every commit, 15 commits, never pushed, never merged.** SMS-5 carries his own
+  DEFERRED stamp; the other seven are undecided and answerable in one word from the board.
 - **Run status, 2026-07-27: OPEN-ENDED on Dylan's direct word** (lane-kickoffs rule 10) —
   finishing the chartered job is not the end. Ends only on his word here, a
   `STOP-THE-RUN` line at the top of this file, or a fence that needs him.
