@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Report where the August season rollover stands.
+
+    ./tools/rollover-check            # print the state of every item
+    ./tools/rollover-check --strict   # exit 1 if anything is mechanically stale
+
+CLAUDE.md's "Season rollover checklist (do every August)" lists config that
+goes stale silently — a dead filter chip, last season's title race, a
+primetime game that vanishes with no error. This turns that prose into
+something you can run. `tools/validate` prints its one-line summary on every
+run, so the state is visible without anyone remembering to look.
+
+The logic is in app/rollover.py, which is pure and unit-tested; this file is
+only the printing.
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import config                                     # noqa: E402
+from app import rollover                          # noqa: E402
+
+MARK = {
+    rollover.OK: "  ok      ",
+    rollover.STALE: "  STALE   ",
+    rollover.NEEDS_YOU: "  you     ",
+}
+
+
+def main():
+    results = rollover.run_all(config)
+    width = max(len(r["item"]) for r in results)
+
+    print("Season rollover — CLAUDE.md checklist, checked against config.py\n")
+    for r in results:
+        print(MARK[r["state"]] + r["item"].ljust(width) + "  " + r["detail"])
+
+    print("\n" + rollover.summary(results))
+    print("\n  STALE   = a date has passed or a value is empty; no judgement "
+          "needed, a session can fix it")
+    print("  you     = a call only you can make; the checker's job is to ask "
+          "at the right time of year")
+
+    if "--strict" in sys.argv:
+        stale = [r for r in results if r["state"] == rollover.STALE]
+        return 1 if stale else 0
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

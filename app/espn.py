@@ -771,6 +771,35 @@ def get_all_standings():
     return results
 
 
+def season_match_count(team_count):
+    """How many league matches each team plays in a season, from the size
+    of the table.
+
+    A double round-robin — everyone home and away — is 2 * (n - 1). That is
+    38 for a 20-team league (Premier League, La Liga, Serie A) and 34 for an
+    18-team one (Bundesliga, Ligue 1).
+
+    Derived rather than configured on purpose. `get_title_races()` used to
+    hardcode 38 while looping over EVERY configured race, so a Bundesliga
+    race would have over-counted remaining matches by 4 — twelve points of
+    "still reachable" that do not exist — silently, with no exception. A
+    hand-maintained per-league map would fix today's leagues and then go
+    stale exactly like everything else on the August checklist; the table
+    already knows how many teams are in it.
+
+    Returns None for a table too small to be a league (a cup group, an empty
+    pre-season fetch), because guessing there is how the original bug read.
+
+    Caveat worth knowing before configuring an exotic race: this assumes a
+    plain double round-robin. A split season (Scottish Premiership) or a
+    conference format (MLS) plays a different number, and this would be
+    wrong for them in the same direction the old constant was.
+    """
+    if not isinstance(team_count, int) or team_count < 4:
+        return None
+    return 2 * (team_count - 1)
+
+
 def fetch_upcoming_fixtures(league_slug, team_id):
     """
     Find a soccer team's upcoming fixtures by scanning the league calendar.
@@ -841,14 +870,23 @@ def get_title_races():
         for group in standing["groups"]:
             all_teams.extend(group["teams"])
 
+        # Season length comes from the table's own size, not a constant —
+        # see season_match_count(). None means we could not tell, and in
+        # that case the race ships without the "Left" figure rather than
+        # with a made-up one.
+        total_matches = season_match_count(len(all_teams))
+
         contenders = []
         for tid in team_ids:
             for t in all_teams:
                 if t["team"]["id"] == tid:
                     pts = int(t["stats"].get("pts", 0))
                     gp = int(t["stats"].get("gp", 0))
-                    # Premier League has 38 match days
-                    remaining = 38 - gp
+                    # max(0, …) guards a table that grew mid-season or a
+                    # gp ESPN has not caught up with: negative matches
+                    # remaining would render as a real number.
+                    remaining = (max(0, total_matches - gp)
+                                 if total_matches is not None else None)
 
                     # Fetch remaining fixtures from the league calendar
                     upcoming_list = fetch_upcoming_fixtures(league_slug, tid)
@@ -859,7 +897,8 @@ def get_title_races():
                         "pts": pts,
                         "gp": gp,
                         "remaining": remaining,
-                        "max_pts": pts + (remaining * 3),
+                        "max_pts": (pts + remaining * 3
+                                    if remaining is not None else None),
                         "ppg": round(pts / gp, 2) if gp > 0 else 0,
                         "upcoming": upcoming_list,
                     })
@@ -889,7 +928,14 @@ def get_title_races():
             "preseason": standing.get("preseason", False),
             "contenders": contenders,
             "gap": leader["pts"] - challenger["pts"],
-            "games_in_hand": challenger["remaining"] - leader["remaining"],
+            # None when the season length is unknown — the subtraction below
+            # would raise, and a 0 would claim both have played the same
+            # number of games when we simply do not know.
+            "games_in_hand": (
+                challenger["remaining"] - leader["remaining"]
+                if None not in (challenger["remaining"], leader["remaining"])
+                else None
+            ),
         })
 
     return races

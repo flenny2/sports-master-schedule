@@ -2242,11 +2242,14 @@ function buildTitleRace(race) {
         row.appendChild(team);
 
         var stats = el("div", "race-stats");
+        // "Left" is dropped rather than shown as null when the server
+        // could not work out the season length (see season_match_count) —
+        // a stat box reading "null" is worse than one fewer stat box.
         var statItems = [
             { val: c.pts,       label: "Pts" },
             { val: c.gp,        label: "GP" },
             { val: c.remaining, label: "Left" }
-        ];
+        ].filter(function(s) { return s.val !== null && s.val !== undefined; });
         statItems.forEach(function(s) {
             var box = el("div", "race-stat");
             box.appendChild(
