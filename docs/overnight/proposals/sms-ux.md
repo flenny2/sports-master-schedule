@@ -11,7 +11,7 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
 2026-07-26 and merged to `master` locally (`--no-ff`). STILL NOT PUSHED: push is a Render
 deploy and is his hand only.** SMS-4 onward are on `auto/lane-sms-jul27`, branched from
 that merge, and are **undecided**.
-**Suite:** 252 passed (`./tools/validate`), green at every commit. Baseline at the start of
+**Suite:** 254 passed (`./tools/validate`), green at every commit. Baseline at the start of
 the Jul-27 lane was 197.
 **Receipts:** every entry from SMS-4 on ends with a `RECEIPTS` line (run-law rule 14) so a
 read-only audit can verify this run without a live reviewer seat.
@@ -255,6 +255,59 @@ read-only audit can verify this run without a live reviewer seat.
 - **KEEP / DISCARD** —
 - **RECEIPTS** — suite 252 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · duplicate confirmed gone against the running app at 390px
 
+### SMS-10 — The button that spends money is now big enough to hit
+
+- **WHAT** — I drove the whole tactical-read flow on a phone for the first time:
+  open an upcoming game, press the read button, wait for it, read it. The panel
+  itself is in good shape — five sections, nothing cut off, nothing spilling out
+  of the card, readable line length. One thing was wrong and it is the one that
+  matters: **the button that spends money was too small to hit reliably**, and so
+  was "Refresh read", which deliberately spends again. Both are the standard size
+  now.
+- **WHY** — This is the most expensive thing in the app and the reason the hub
+  exists beyond a schedule, and nobody had ever looked at it on a phone. Whatever
+  you saw the first time you pressed that button would have been whatever it
+  happened to look like. The check costs **nothing to run**: with no API key set,
+  the server returns stand-in text in the same shape a real read has, so the whole
+  chain works end to end at $0.
+- **WHERE** — `static/style.css` (two buttons), new `tools/qa-phone-intel.py` +
+  `docs/overnight/mockups/qa-intel.html`, two tests. Commit `a4a557f`.
+  Shot: `docs/overnight/shots/sms-10-intel-390.png`. 252 → 254 tests.
+- **RISK** — Very low as a change: two buttons got taller. The honest caveat is
+  about the *check*, not the change — it runs against stand-in text, so it proves
+  the layout and the plumbing, not what a real read reads like. That is still your
+  call to make when you set the key. Three bugs in my own test rig had to be fixed
+  before it worked at all, which is a fair warning that this flow is the least
+  exercised part of the app.
+- **KEEP / DISCARD** —
+- **RECEIPTS** — suite 254 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · driven at $0 in dry-run; the generated read was wiped from the user-data store afterwards
+
+### SMS-11 — Cards stop claiming a league position before anyone has played
+
+- **WHAT** — Open an August Premier League game and the card said
+  **"ARS: 2nd in Premier League · AVL: 3rd in Premier League"**. Nobody has played
+  a match. Between seasons the data source zeroes everything and sorts the table
+  alphabetically, so "2nd" meant *second in the alphabet*. That line no longer
+  appears until the season is real.
+- **WHY** — This is the same thing you asked me to fix in July — "fix the zeros" —
+  which was fixed in four places. The game card was a fifth that nobody had
+  counted. It only shows up between seasons, which is exactly now.
+- **WHERE** — `static/app.js`. Commit `d5dfd02`. Verified both ways against the
+  running app: an August Premier League card shows no standings line, and a July
+  World Cup card still shows **"JPN: 2nd in FIFA World Cup · BRA: 1st in FIFA
+  World Cup"** — the fiction gone, the fact kept.
+- **RISK** — While fixing it I found a second thing and fixed it in the same
+  change: the card looked up a team's position in whichever league it found them
+  in FIRST, not the one they were playing in. With the Premier League skipped it
+  briefly showed "ARS: 1st in Champions League" on a Premier League fixture. It
+  had always worked that way and had simply been getting lucky. That is a
+  behaviour change beyond the headline fix, so it is worth knowing about. Like
+  SMS-9, the gate lives in browser code and this repo has no way to test browser
+  code without adding a tool the lane rules forbid — so it is verified by
+  screenshots at both ends.
+- **KEEP / DISCARD** —
+- **RECEIPTS** — suite 254 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · verified in both directions against the running app at 390px
+
 ---
 
 ## Idea queue
@@ -386,6 +439,31 @@ read-only audit can verify this run without a live reviewer seat.
   limit recorded in the entry: the deciding half is browser code and this repo has no
   JS runner, so the server half is tested and the browser half is a screenshot.
   251 → 252 tests.
+- **CYCLE 10 — the tactical read, driven on a phone for the first time — SHIPPED
+  `a4a557f`.** The app's most expensive feature, never looked at on a phone, checked
+  at $0 because dry-run returns the same SHAPE a real read has. The panel was fine;
+  the button that SPENDS was 40px, and so was "Refresh read". Neither was reachable
+  by any earlier sweep — both only exist inside an expanded card of an upcoming
+  soccer or NFL game, and the off-season Calendar shows none. **Three bugs in my own
+  rig had to be fixed first, and all three would have produced a confident wrong
+  answer:** (a) the shared proxy had no `do_POST`, so every write hit a 501 the
+  handler wrote itself and never reached Flask — and `fetch` resolves either way, so
+  the symptom was "no read after 500 polls" against a server that was never asked;
+  (b) waits keyed on `Date.now()` are wrong under a virtual clock, which races ahead
+  whenever the page is idle, so a "60 second" deadline expires in a blink while the
+  real round-trips have not landed — this harness counts ticks; (c) it waited only
+  for the read BUTTON, so the screenshot run timed out against a healthy page that
+  was showing a cached read and a Refresh link instead. 252 → 254 tests.
+- **CYCLE 11 — the preseason standing on a game card — SHIPPED `d5dfd02`.** Found by
+  reading cycle 10's screenshot, not the code. Worth keeping: the obvious fix was
+  **not sufficient and its intermediate state looked plausible** — with the Premier
+  League skipped as preseason, the finder fell through to the next league holding
+  that team id and printed "ARS: 1st in Champions League" on a Premier League
+  fixture. It had always taken the first id match anywhere and had simply been
+  landing on the right league by luck. Scoping to the game's own competition fixes
+  both and closes the documented id-collision trap. Verified in BOTH directions,
+  which is what makes it a fix rather than a deletion: the August PL card shows no
+  row, the July World Cup card still shows one.
 - **Run status, 2026-07-27: OPEN-ENDED on Dylan's direct word** (lane-kickoffs rule 10) —
   finishing the chartered job is not the end. Ends only on his word here, a
   `STOP-THE-RUN` line at the top of this file, or a fence that needs him.

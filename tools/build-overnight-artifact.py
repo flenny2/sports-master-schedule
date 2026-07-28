@@ -397,18 +397,21 @@ BOARD_HTML = """
 
   <header class="head">
     <div class="eyebrow">Sports hub · lane · Mon 27 Jul 2026</div>
-    <h1>Six to rule on,<br>one to deploy</h1>
+    <h1>Eight to rule on,<br>one to deploy</h1>
     <p class="lede">
-      Six new things. Five are defects fixed, and you only have to say keep or discard:
-      the tab row was sliding up behind the iPhone clock as you scrolled and a third of
-      the things you can tap were too small (<b>SMS-4</b>) · the list of settings that
-      quietly go out of date every August is a command now instead of a note, and the
-      one real bug on it is fixed (<b>SMS-6</b>) · the Calendar's storyline filter
-      expired on 31 May and has been missing for two months (<b>SMS-7</b>) · the banner
-      card was cutting "CAROLINA PANTHERS" in half (<b>SMS-8</b>) · and Home was showing
-      two cards for the same story (<b>SMS-9</b>).
-      One needs a real choice: <b>SMS-5</b>, the big banner at the top of Home draws
-      nothing at all out of season, so here are two things that could fill it.
+      Eight new things, and only ONE of them asks you to choose anything.
+      <b>SMS-5</b> is that one: the big banner at the top of Home draws nothing at all
+      out of season, so here are two ways to fill it — pick A, pick B, or say neither.
+      <br><br>
+      The other seven are defects, already fixed, needing only keep or discard: the tab
+      row was sliding behind the iPhone clock and a third of the things you can tap were
+      too small (<b>SMS-4</b>) · the settings that quietly go stale every August are a
+      command now instead of a note, and the one real bug on that list is fixed
+      (<b>SMS-6</b>) · the Calendar's storyline filter expired on 31 May and had been
+      missing for two months (<b>SMS-7</b>) · the banner was cutting "CAROLINA PANTHERS"
+      in half (<b>SMS-8</b>) · Home was showing two cards for one story (<b>SMS-9</b>) ·
+      the button that spends money was too small to hit (<b>SMS-10</b>) · and game cards
+      were claiming league positions before anyone had played (<b>SMS-11</b>).
     </p>
     <p class="muted">
       SMS-1, SMS-2 and SMS-3 are the calendar work you already kept on 26 July. They are
@@ -421,7 +424,7 @@ BOARD_HTML = """
     <p><b>Three things, and they are separate.</b></p>
 
     <div class="opt">
-      <span class="opt-name">1 · Keep or discard SMS-4, 6, 7, 8 and 9</span>
+      <span class="opt-name">1 · Keep or discard SMS-4, 6, 7, 8, 9, 10 and 11</span>
       <span class="muted">Reply with the ID. The full case is below, with a picture of the
       before and after.</span>
     </div>
@@ -442,7 +445,7 @@ BOARD_HTML = """
       <br><br>
       <code class="cmd">git push origin master</code>
       <br>
-      SMS-4 through SMS-9 are <b>not</b> in that push — they sit on the branch
+      SMS-4 through SMS-11 are <b>not</b> in that push — they sit on the branch
       <code>auto/lane-sms-jul27</code> until you rule on them.
     </div>
   </section>
@@ -450,7 +453,7 @@ BOARD_HTML = """
   <section style="display:flex;flex-direction:column;gap:16px">
     <h2>The proposals</h2>
     <p class="muted">
-      Reply with IDs — "keep 4, 6, 7, 8, 9; SMS-5 is B" — and the next session does exactly that.
+      Reply with IDs — "keep all but 5, and 5 is B" works too — and the next session does exactly that.
       IDs are never reused, so they stay valid forever.
     </p>
 
@@ -704,6 +707,89 @@ you    FANTASY_ROSTER
           forbid. So the server half is covered by tests and the browser half by a
           screenshot. It also only bites when a storyline and a title race describe the
           same competition, which is exactly your current setup.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
+      </dl>
+    </article>
+
+    <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-10</span>
+        <span class="prop-title">The button that spends is big enough to hit</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          I drove the whole tactical-read flow on a phone for the first time — open
+          an upcoming game, press the read button, wait, read it. The panel itself is
+          in good shape: five sections, nothing cut off, nothing spilling out of the
+          card, readable line length. One thing was wrong and it is the one that
+          matters: <b>the button that spends money was too small to hit reliably</b>,
+          and so was "Refresh read", which deliberately spends again. Both are the
+          standard size now.
+        </dd></div>
+        <div><dt>On a real phone</dt><dd>
+          <div class="ba tall-pair">
+            <figure>
+              <img class="shot" alt="The match intel panel with a tactical read, at phone width"
+                   src="__SHOT_INTEL__">
+              <figcaption>The read, at 390px</figcaption>
+            </figure>
+          </div>
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          This is the most expensive thing in the app and the reason the hub exists
+          beyond a schedule, and nobody had looked at it on a phone. The check itself
+          costs <b>nothing</b>: with no API key set the server returns stand-in text
+          in the same shape a real read has, so the whole chain runs end to end at $0.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          <code>static/style.css</code> (two buttons), a new phone harness, two tests.
+          Commit <code>a4a557f</code>. 254 tests.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          Very low as a change — two buttons got taller. The honest caveat is about
+          the check, not the change: it runs against stand-in text, so it proves the
+          layout and the plumbing, not what a real read reads like. That is still
+          yours to judge when you set the key. Three bugs in my own test rig had to be
+          fixed before it worked at all, which is fair warning that this is the least
+          exercised part of the app.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
+      </dl>
+    </article>
+
+    <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-11</span>
+        <span class="prop-title">No league position before anyone has played</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          Open an August Premier League game and the card said
+          <b>"ARS: 2nd in Premier League · AVL: 3rd in Premier League"</b>. Nobody has
+          played a match. Between seasons the data source zeroes everything and sorts
+          the table alphabetically — "2nd" meant second in the alphabet. That line no
+          longer appears until the season is real.
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          Same thing you asked me to fix in July — "fix the zeros" — which was fixed
+          in four places. The game card was a fifth nobody had counted. It only shows
+          up between seasons, which is exactly now.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          <code>static/app.js</code>. Commit <code>d5dfd02</code>. Verified both ways
+          against the running app: an August Premier League card shows no standings
+          line, and a July World Cup card still shows
+          <b>"JPN: 2nd in FIFA World Cup · BRA: 1st in FIFA World Cup"</b> — the
+          fiction gone, the fact kept.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          While fixing it I found a second thing and fixed it in the same change: the
+          card looked up a team's position in whichever league it found them in
+          FIRST, not the one they were playing in. With the Premier League skipped it
+          briefly showed "ARS: 1st in Champions League" on a Premier League fixture.
+          It had always worked that way and had simply been getting lucky — so that
+          is a behaviour change beyond the headline fix, worth knowing about.
         </dd></div>
         <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
       </dl>
@@ -970,10 +1056,10 @@ you    FANTASY_ROSTER
   </section>
 
   <footer class="foot">
-    <b>Branch</b> auto/lane-sms-jul27 (SMS-4 through SMS-9 — all undecided) · off master,
+    <b>Branch</b> auto/lane-sms-jul27 (SMS-4 through SMS-11 — all undecided) · off master,
     which carries SMS-1..3 merged and <b>never pushed</b><br>
     <b>Deploy</b> untouched — pushing this repo is a deploy and only ever your hand<br>
-    <b>Tests</b> 252 passing (./tools/validate) · was 197 at the start of this lane<br>
+    <b>Tests</b> 254 passing (./tools/validate) · was 197 at the start of this lane<br>
     <b>Measured</b> against the running app at a true 390px viewport — 71 tap targets,
     all four tabs, safe areas simulated at iPhone 15 values<br>
     <b>Full detail</b> docs/overnight/proposals/sms-ux.md
@@ -1040,6 +1126,7 @@ def main():
             .replace("__SHOT_AFTER__", shot_uri("sms-2-home-nextup-after.png"))
             .replace("__SHOT_CAL__", shot_uri("sms-3-calendar-390.png"))
             .replace("__SHOT_DESK__", shot_uri("sms-3-calendar-desktop.png"))
+            .replace("__SHOT_INTEL__", shot_uri("sms-10-intel-390.png"))
             .replace("__SHOT_STORYLINE__", shot_uri("sms-7-calendar-storyline-390.png"))
             .replace("__SHOT_HEAD_A__", shot_uri("sms-5-headline-a-nextgame.png"))
             .replace("__SHOT_HEAD_B__", shot_uri("sms-5-headline-b-countdown.png"))
