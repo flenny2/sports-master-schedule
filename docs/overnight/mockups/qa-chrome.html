@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<!--
+  QA-CHROME — measures the REAL app's phone CHROME at a true phone width.
+
+  Sibling of qa-frame.html (which measures the calendar). Same two tricks,
+  for the same two reasons:
+
+  1. `google-chrome --headless --window-size=390,844` does NOT give a 390px
+     viewport — Chrome clamps its window to a 500px minimum on Linux, so a
+     phone pass driven that way measures 500px and reports green on a layout
+     that breaks at 390. An iframe has no such clamp.
+  2. Reading into that iframe needs SAME ORIGIN, which tools/qa-phone-chrome.py
+     provides by serving this file and proxying everything else to Flask.
+
+  What "chrome" means here: the frame around the content that is present on
+  every view — masthead, the sticky tab bar, the sport filter pills, the
+  month arrows, the footer — plus the two things a phone adds that a desktop
+  browser never shows you: the notch/home-indicator safe areas, and the fact
+  that a finger is ~44px wide.
+
+  Usage: qa-chrome.html?w=390  (see the driver)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>qa-chrome</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #B8C0CC; }
+  #stage { width: max-content; margin: 0 auto; background: #EEF1F5;
+           position: relative; }
+  iframe { display: block; border: 0; }
+  pre { font: 12px monospace; padding: 8px; white-space: pre-wrap; }
+
+  /* Notch simulation for the screenshots (?sa=1). The bands mark the zones
+     iOS reserves for the status bar and the home indicator; anything the
+     app draws underneath one of them is a thing you cannot read or tap. */
+  .sa-band {
+    position: absolute; left: 0; right: 0;
+    background: rgba(211, 23, 53, 0.30);
+    border: 1px dashed rgba(211, 23, 53, 0.85);
+    font: 700 10px/1 monospace; letter-spacing: 0.12em;
+    color: #6B0B1B; text-align: center; padding-top: 5px;
+    box-sizing: border-box; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="stage"><iframe id="f" title="app under test"></iframe></div>
+<pre id="qa-out">running…</pre>
+
+<script>
+(function () {
+    var q = new URLSearchParams(location.search);
+    var W = parseInt(q.get("w") || "390", 10);
+    var SHOT = q.get("sa") === "1";   /* screenshot mode: draw the bands, skip asserts */
+    var SCROLL = parseInt(q.get("scroll") || "0", 10);
+    var TAP = 44;          /* the documented minimum, --tap-min in style.css */
+
+    /* Stand-in inset values. A headless browser never reports real ones, so
+       the harness INJECTS them and asserts the layout moved. Numbers are a
+       real iPhone 15 in portrait: 59px status bar / 34px home indicator. */
+    var SAT = 59, SAB = 34;
+
+    var out = document.getElementById("qa-out");
+    var f = document.getElementById("f");
+    f.style.width = W + "px";
+    f.style.height = "844px";
+
+    var fails = [], notes = [];
+    function check(name, ok, detail) {
+        (ok ? notes : fails).push((ok ? "PASS  " : "FAIL  ") + name + " — " + detail);
+    }
+    function finish() {
+        out.textContent = fails.concat(notes).join("\n") + "\n" +
+            (fails.length ? "RESULT: " + fails.length + " FAILED" : "RESULT: ALL PASS");
+        document.title = fails.length ? "QA FAIL" : "QA PASS";
+    }
+
+    /* DOM probe rather than a guessed delay (headless-qa rule 1): the app
+       fetches before it can draw, and each tab draws on first selection. */
+    function waitFor(doc, sel, deadline, done) {
+        if (doc.querySelector(sel)) return done(true);
+        if (Date.now() > deadline) return done(false);
+        setTimeout(function () { waitFor(doc, sel, deadline, done); }, 100);
+    }
+
+    /* Every control a thumb can hit. Deliberately NOT "every button": the
+       measure is about reachable chrome, so hidden views are skipped by the
+       caller and zero-size nodes (display:none) are dropped here. */
+    function targets(doc, root) {
+        var sel = "button, [role=tab], a[href], input, select, [tabindex]:not([tabindex='-1'])";
+        var found = [];
+        root.querySelectorAll(sel).forEach(function (n) {
+            var r = n.getBoundingClientRect();
+            if (r.width < 1 || r.height < 1) return;       /* not on screen */
+            found.push({ node: n, rect: r });
+        });
+        return found;
+    }
+
+    function label(n) {
+        var t = (n.getAttribute("aria-label") ||
+                 n.textContent || "").trim().replace(/\s+/g, " ");
+        if (t.length > 22) t = t.slice(0, 22) + "…";
+        return (n.className ? "." + String(n.className).split(" ")[0] : n.tagName) +
+               (t ? ' "' + t + '"' : "");
+    }
+
+    f.addEventListener("load", function () {
+        var doc = f.contentDocument;
+        var win = f.contentWindow;
+
+        waitFor(doc, ".game-card, .fp-block, .status-message:not(:empty)",
+                Date.now() + 25000, function (ready) {
+            check("app rendered the front page within 25s", ready,
+                  ready ? "found" : "timed out — is the app serving data?");
+            if (!ready) return finish();
+
+            if (SHOT) return shotMode(doc, win);
+
+            check("viewport really is " + W + "px", win.innerWidth === W,
+                  "innerWidth " + win.innerWidth);
+
+            /* ── 1. Tap targets across every tab ───────────────────────
+               A control below 44px in EITHER dimension is a miss risk, so
+               both are measured and the worst offenders are named. Tabs are
+               visited in turn because three of the four views are
+               display:none until selected and measure 0×0 while hidden. */
+            var VIEWS = [
+                ["front",    "#front-view"],
+                ["week",     "#week-view"],
+                ["playoffs", "#playoffs-view"],
+                ["tables",   "#tables-view"]
+            ];
+            var small = [], seen = {}, counted = 0;
+
+            function sweep(i, after) {
+                if (i >= VIEWS.length) return after();
+                var name = VIEWS[i][0], sel = VIEWS[i][1];
+                var tab = doc.querySelector('.tab[data-view="' + name + '"]');
+                if (tab) tab.click();
+
+                setTimeout(function () {
+                    var view = doc.querySelector(sel);
+                    var scope = [doc.querySelector("header"),
+                                 doc.querySelector(".tab-bar"),
+                                 view,
+                                 doc.querySelector("footer")];
+                    scope.forEach(function (root) {
+                        if (!root) return;
+                        targets(doc, root).forEach(function (t) {
+                            var key = name + "|" + label(t.node) + "|" +
+                                      Math.round(t.rect.width) + "x" +
+                                      Math.round(t.rect.height);
+                            if (seen[key]) return;
+                            seen[key] = 1;
+                            counted++;
+                            if (t.rect.width < TAP - 0.5 || t.rect.height < TAP - 0.5) {
+                                small.push(name + " " + label(t.node) + " " +
+                                           t.rect.width.toFixed(0) + "x" +
+                                           t.rect.height.toFixed(0));
+                            }
+                        });
+                    });
+                    sweep(i + 1, after);
+                }, 700);
+            }
+
+            sweep(0, function () {
+                check("every tappable control clears " + TAP + "px",
+                      small.length === 0,
+                      small.length === 0
+                          ? counted + " controls measured, all ≥" + TAP + "px"
+                          : small.length + " of " + counted + " under: " +
+                            small.join(" · "));
+
+                /* ── 2. The sticky tab bar actually sticks ───────────── */
+                doc.querySelector('.tab[data-view="week"]').click();
+                setTimeout(function () {
+                    win.scrollTo(0, 600);
+                    setTimeout(function () {
+                        var bar = doc.querySelector(".tab-bar");
+                        var r = bar.getBoundingClientRect();
+                        check("tab bar stays pinned after a 600px scroll",
+                              Math.abs(r.top - stickyTop(win, bar)) < 1.5,
+                              "top " + r.top.toFixed(1) + "px, expected " +
+                              stickyTop(win, bar).toFixed(1));
+
+                        /* An opaque-enough bar: content scrolling under a
+                           see-through bar is the classic phone regression. */
+                        var bg = win.getComputedStyle(bar).backgroundColor;
+                        var a = /rgba?\([^)]*?,\s*([\d.]+)\s*\)$/.exec(bg);
+                        check("tab bar background is near-opaque",
+                              !a || parseFloat(a[1]) >= 0.9,
+                              "background " + bg);
+                        win.scrollTo(0, 0);
+                        setTimeout(overflowPass, 150);
+                    }, 200);
+                }, 400);
+            });
+
+            /* Sticky top = whatever CSS pins it to, resolved live rather
+               than assumed 0 — the fix moves it to the safe-area inset. */
+            function stickyTop(w, el) {
+                var t = w.getComputedStyle(el).top;
+                var n = parseFloat(t);
+                return isNaN(n) ? 0 : n;
+            }
+
+            /* ── 3. No sideways scroll on any tab ─────────────────────
+               Measured per view, because a wide table in Tables cannot be
+               seen from the Home page. */
+            function overflowPass() {
+                var bad = [];
+                var i = 0;
+                (function next() {
+                    if (i >= VIEWS.length) {
+                        check("no horizontal overflow on any tab", bad.length === 0,
+                              bad.length === 0 ? "all four tabs fit " + W + "px"
+                                               : bad.join(" · "));
+                        return safeAreaPass();
+                    }
+                    var name = VIEWS[i][0];
+                    doc.querySelector('.tab[data-view="' + name + '"]').click();
+                    setTimeout(function () {
+                        var sw = doc.documentElement.scrollWidth;
+                        if (sw > win.innerWidth + 1) {
+                            bad.push(name + " scrollWidth " + sw);
+                        }
+                        i++; next();
+                    }, 500);
+                })();
+            }
+
+            /* ── 4. Does the layout respond to the notch at all? ──────
+               index.html sets viewport-fit=cover, which tells iOS to draw
+               the page UNDER the status bar and home indicator. That is
+               only correct if the CSS then pays the insets back. Headless
+               Chrome always reports 0px for env(), so this asserts the
+               WIRING: override the inset variables and check that the
+               chrome MOVED — and it measures where things landed on screen
+               rather than which property changed (headless-qa rule 2), so
+               it stays true whichever property carries the offset. */
+            function safeAreaPass() {
+                doc.querySelector('.tab[data-view="front"]').click();
+                setTimeout(function () {
+                    doc.documentElement.style.setProperty("--sa-top", SAT + "px");
+                    doc.documentElement.style.setProperty("--sa-bottom", SAB + "px");
+
+                    setTimeout(function () {
+                        win.scrollTo(0, 0);
+                        var brand = doc.querySelector(".brand");
+                        var bt = brand.getBoundingClientRect().top;
+                        check("masthead sits below the status bar", bt >= SAT - 0.5,
+                              "brand top " + bt.toFixed(1) + "px, status bar " + SAT + "px");
+
+                        /* The tabs matter WHEN PINNED — unpinned they are
+                           already below the masthead, so scrolling first is
+                           the only state where this can fail. */
+                        win.scrollTo(0, 600);
+                        setTimeout(function () {
+                            var tab = doc.querySelector(".tab");
+                            var tt = tab.getBoundingClientRect().top;
+                            check("pinned tabs clear the status bar", tt >= SAT - 0.5,
+                                  "first tab top " + tt.toFixed(1) + "px while pinned");
+
+                            var foot = doc.querySelector("footer");
+                            var note = doc.querySelector(".footnote");
+                            var gap = foot.getBoundingClientRect().bottom -
+                                      note.getBoundingClientRect().bottom;
+                            check("footer text clears the home indicator",
+                                  gap >= SAB - 0.5,
+                                  "last line sits " + gap.toFixed(1) +
+                                  "px above the page bottom, indicator " + SAB + "px");
+
+                            doc.documentElement.style.removeProperty("--sa-top");
+                            doc.documentElement.style.removeProperty("--sa-bottom");
+                            win.scrollTo(0, 0);
+                            finish();
+                        }, 250);
+                    }, 200);
+                }, 400);
+            }
+        });
+    });
+
+    /* Screenshot mode: put the app in the state a notched iPhone puts it in
+       (insets injected, scrolled far enough that the tab bar is pinned) and
+       lay the reserved zones over the top so the picture shows what the
+       numbers say. No asserts here — the driver shoots the same URL against
+       the old CSS and the new one, and the pair IS the evidence. */
+    function shotMode(doc, win) {
+        doc.documentElement.style.setProperty("--sa-top", SAT + "px");
+        doc.documentElement.style.setProperty("--sa-bottom", SAB + "px");
+        win.scrollTo(0, SCROLL);
+
+        var stage = document.getElementById("stage");
+        var top = document.createElement("div");
+        top.className = "sa-band";
+        top.style.top = "0";
+        top.style.height = SAT + "px";
+        top.textContent = "STATUS BAR / NOTCH";
+        var bot = document.createElement("div");
+        bot.className = "sa-band";
+        bot.style.bottom = "0";
+        bot.style.height = SAB + "px";
+        bot.textContent = "HOME INDICATOR";
+        stage.appendChild(top);
+        stage.appendChild(bot);
+
+        out.textContent = "shot mode — insets " + SAT + "/" + SAB +
+                          "px, scrolled " + SCROLL + "px";
+        document.title = "QA SHOT";
+    }
+
+    f.src = "/#front";
+})();
+</script>
+</body>
+</html>
