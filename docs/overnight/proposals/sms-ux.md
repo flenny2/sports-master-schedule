@@ -179,6 +179,32 @@ the Jul-27 lane was 197.
   asks rather than guessing.
 - **KEEP / DISCARD** —
 
+### SMS-7 — The Calendar has its storyline filter back
+
+- **WHAT** — Three things, all from acting on what SMS-6's checker reported.
+  **The filter:** the PL Title Race chip on the Calendar — the one that shows only
+  Arsenal and Man City games — expired on 31 May and nothing replaced it, so it has
+  been gone for two months. Renewed for the new season; the chip is back.
+  **Dead setting:** a leftover NBA setting that nothing had used since NBA was
+  unplugged is deleted. **And one it was hiding:** bringing the chip back made it
+  visible to the phone measurements for the first time, and it was 38 pixels tall
+  against the 44 the app asks for. Fixed too.
+- **WHY** — Nothing was broken, which is the point: an expired storyline correctly
+  stops showing, and then nothing replaces it, and the Calendar just quietly loses a
+  feature. That is the exact failure the August checklist warns about, and it had
+  already happened before anybody ran the checklist.
+- **WHERE** — `config.py`, `static/style.css`, tests in `tests/test_storylines.py`
+  and `tests/test_phone_chrome.py`. Commit `a97934e`. Shot:
+  `docs/overnight/shots/sms-7-calendar-storyline-390.png`. 246 → 249 tests, and the
+  checker now reports **0 stale**.
+- **RISK** — I chose the contenders by carrying last season's forward: Arsenal and
+  Man City again. That is a guess about your new season, not a fact, and it is the
+  same guess the title-race widget is already making — the checker asks you about it
+  separately for that reason. If you want different teams, it is two ids in one file.
+  Deleting the NBA setting is only awkward if NBA comes back, and a comment in its
+  place says where the old values live. Live code: keeping it means a deploy.
+- **KEEP / DISCARD** —
+
 ---
 
 ## Idea queue
@@ -195,10 +221,8 @@ the Jul-27 lane was 197.
 5. ~~The season-rollover checklist goes stale silently every August~~ → **CYCLE 6,
    shipped as SMS-6.** The checklist is a command now, and the one real bug in it (the
    hardcoded 38-match season) is fixed. What it found is the next cycle's work.
-6. **Act on the two STALE items the checker reports** — the expired PL storyline (the
-   Calendar has no filter) and `NBA_NATIONAL_NETWORKS` (defined, used by nothing).
-   Deliberately NOT folded into SMS-6 so the mechanism can be kept and the content
-   changes discarded separately.
+6. ~~Act on the two STALE items the checker reports~~ → **CYCLE 7, shipped as SMS-7.**
+   Both cleared; the checker reports 0 stale.
 7. The three `needs-you` items the checker asks about — title-race contenders for the
    new season, the primetime network set against the 26-27 rights deals, the fantasy
    roster after the late-August draft. All Dylan's; the checker's job is only to ask.
@@ -272,6 +296,20 @@ the Jul-27 lane was 197.
   months. Advisory, never fatal: a red suite would block every future session on a
   config choice that is his. Verified the new tests fail 15/17 against the old
   constant. 206 → 246 tests.
+- **CYCLE 7 — clear both stale rollover items — SHIPPED `a97934e`.** The cycle's own
+  lesson is the third thing it found. Renewing the storyline made the Calendar's filter
+  chip render for the first time in two months, and the phone harness failed on it
+  immediately: 38px against the documented 44. **SMS-4's live pass could not have caught
+  it** — the whole filter row was hidden that day and measured 0×0. A measurement
+  harness only covers what is on screen, so a control that appears seasonally needs a
+  static check too; `.sl-chip` is now in both. Also worth keeping: the new storyline's
+  `start_date` is **1 June, not 1 August**, so its window is exactly complementary to
+  the expired entry's — an August floor would have left the chip missing another five
+  days while the checker called it "ok", because `get_active_storylines` withholds a
+  storyline whose start has not arrived. And it HAS a start_date at all, which its
+  predecessor deliberately did not: that omission was safe when 25-26 was the only
+  season the app had seen, and would now back-tag every Arsenal–City match from last
+  season with a 26-27 chip. 246 → 249 tests.
 - **Run status, 2026-07-27: OPEN-ENDED on Dylan's direct word** (lane-kickoffs rule 10) —
   finishing the chartered job is not the end. Ends only on his word here, a
   `STOP-THE-RUN` line at the top of this file, or a fence that needs him.

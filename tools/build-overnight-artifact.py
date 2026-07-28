@@ -397,15 +397,16 @@ BOARD_HTML = """
 
   <header class="head">
     <div class="eyebrow">Sports hub · lane · Mon 27 Jul 2026</div>
-    <h1>Three to rule on,<br>one to deploy</h1>
+    <h1>Four to rule on,<br>one to deploy</h1>
     <p class="lede">
-      Three new things to decide. <b>SMS-4</b> — on a real iPhone the tab row was sliding
-      up behind the clock as you scrolled, and a third of the things you can tap were
-      smaller than a fingertip; both fixed and measured. <b>SMS-6</b> — the list of
-      settings that quietly go out of date every August is a command now instead of a
-      note, and the one real bug on it is fixed. <b>SMS-5</b> — the big banner at the top
-      of Home draws nothing at all out of season, so here are two things that could fill
-      it, built rather than guessed at.
+      Four new things. Three are defects fixed, and you only have to say keep or discard:
+      <b>SMS-4</b>, the tab row was sliding up behind the iPhone clock as you scrolled and
+      a third of the things you can tap were smaller than a fingertip. <b>SMS-6</b>, the
+      list of settings that quietly go out of date every August is a command now instead
+      of a note, and the one real bug on it is fixed. <b>SMS-7</b>, the Calendar's
+      storyline filter expired on 31 May and has been missing for two months; it is back.
+      One needs a real choice: <b>SMS-5</b>, the big banner at the top of Home draws
+      nothing at all out of season, so here are two things that could fill it.
     </p>
     <p class="muted">
       SMS-1, SMS-2 and SMS-3 are the calendar work you already kept on 26 July. They are
@@ -415,10 +416,10 @@ BOARD_HTML = """
 
   <section class="decide">
     <h2>What is still owed by you</h2>
-    <p><b>Four things, and they are separate.</b></p>
+    <p><b>Three things, and they are separate.</b></p>
 
     <div class="opt">
-      <span class="opt-name">1 · Keep or discard SMS-4 and SMS-6</span>
+      <span class="opt-name">1 · Keep or discard SMS-4, SMS-6 and SMS-7</span>
       <span class="muted">Reply with the ID. The full case is below, with a picture of the
       before and after.</span>
     </div>
@@ -439,7 +440,7 @@ BOARD_HTML = """
       <br><br>
       <code class="cmd">git push origin master</code>
       <br>
-      SMS-4, SMS-5 and SMS-6 are <b>not</b> in that push — they sit on the branch
+      SMS-4 through SMS-7 are <b>not</b> in that push — they sit on the branch
       <code>auto/lane-sms-jul27</code> until you rule on them.
     </div>
   </section>
@@ -447,7 +448,7 @@ BOARD_HTML = """
   <section style="display:flex;flex-direction:column;gap:16px">
     <h2>The proposals</h2>
     <p class="muted">
-      Reply with IDs — "keep SMS-4 and SMS-6, SMS-5 is B" — and the next session does exactly that.
+      Reply with IDs — "keep SMS-4, SMS-6, SMS-7; SMS-5 is B" — and the next session does exactly that.
       IDs are never reused, so they stay valid forever.
     </p>
 
@@ -585,6 +586,54 @@ you    FANTASY_ROSTER
           past. The season-length fix assumes a normal home-and-away league; a split
           season like the Scottish Premiership would be wrong in the same direction the
           old number was, which is written down at the code.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
+      </dl>
+    </article>
+
+    <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-7</span>
+        <span class="prop-title">The Calendar has its storyline filter back</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          Three things, all from acting on what the checker above reported.
+          <b>The filter:</b> the PL Title Race chip on the Calendar — the one that
+          shows only Arsenal and Man City games — expired on 31 May and nothing
+          replaced it, so it has been gone for two months. Renewed; it is back.
+          <b>A dead setting:</b> a leftover NBA value that nothing has used since NBA
+          was unplugged is deleted. <b>And one it was hiding:</b> bringing the chip
+          back made it visible to the phone measurements for the first time, and it
+          was 38 pixels tall against the 44 the app asks for. Fixed too.
+        </dd></div>
+        <div><dt>On a real phone</dt><dd>
+          <div class="ba tall-pair">
+            <figure>
+              <img class="shot" alt="The Calendar with the PL Title Race filter chip restored"
+                   src="__SHOT_STORYLINE__">
+              <figcaption>The chip, back under the month grid</figcaption>
+            </figure>
+          </div>
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          Nothing was broken, which is the point. An expired storyline correctly stops
+          showing, then nothing replaces it, and the Calendar quietly loses a feature.
+          That is the exact failure the checklist warns about, and it had already
+          happened before anybody ran the checklist.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          <code>config.py</code>, <code>static/style.css</code>, and tests.
+          Commit <code>a97934e</code>. 246 → 249 tests, and
+          <code>./tools/rollover-check</code> now reports <b>0 stale</b>.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          I picked the contenders by carrying last season's forward — Arsenal and Man
+          City again. That is a guess about your new season, not a fact, and it is the
+          same guess the title-race widget is already making, which is why the checker
+          asks you about it separately. If you want different teams it is two ids in
+          one file. Deleting the NBA value is only awkward if NBA comes back, and a
+          comment in its place says where the old values live.
         </dd></div>
         <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
       </dl>
@@ -841,23 +890,20 @@ you    FANTASY_ROSTER
   <section style="display:flex;flex-direction:column;gap:12px">
     <h2>Next in the queue</h2>
     <ol class="list">
-      <li><b>August is in ten days, and five settings go stale in August.</b> The repo's
-        own rollover checklist says so, and one of them has <i>already</i> expired: the
-        Premier League storyline ended on 31 May, so the Calendar has no storyline filter
-        at all right now. Nothing breaks — the app just quietly shows the wrong thing.</li>
       <li><b>Game-card size on a phone.</b> How much fits before a card stops being
         glanceable. The SMS-5 shots already gave this evidence: at banner size a full
         team name truncates to "CAROLINA PANTHE…" on your phone.</li>
     </ol>
-    <p class="muted">Done since the last board: the phone chrome pass (SMS-4) and the two
-      headline mockups (SMS-5).</p>
+    <p class="muted">Done so far tonight: the phone chrome pass (SMS-4), the two headline
+      mockups (SMS-5), the August checklist as a command (SMS-6) and the two stale
+      settings it found (SMS-7).</p>
   </section>
 
   <footer class="foot">
-    <b>Branch</b> auto/lane-sms-jul27 (SMS-4, SMS-5, SMS-6 — all undecided) · off master,
+    <b>Branch</b> auto/lane-sms-jul27 (SMS-4 through SMS-7 — all undecided) · off master,
     which carries SMS-1..3 merged and <b>never pushed</b><br>
     <b>Deploy</b> untouched — pushing this repo is a deploy and only ever your hand<br>
-    <b>Tests</b> 246 passing (./tools/validate) · was 197 at the start of this lane<br>
+    <b>Tests</b> 249 passing (./tools/validate) · was 197 at the start of this lane<br>
     <b>Measured</b> against the running app at a true 390px viewport — 71 tap targets,
     all four tabs, safe areas simulated at iPhone 15 values<br>
     <b>Full detail</b> docs/overnight/proposals/sms-ux.md
@@ -924,6 +970,7 @@ def main():
             .replace("__SHOT_AFTER__", shot_uri("sms-2-home-nextup-after.png"))
             .replace("__SHOT_CAL__", shot_uri("sms-3-calendar-390.png"))
             .replace("__SHOT_DESK__", shot_uri("sms-3-calendar-desktop.png"))
+            .replace("__SHOT_STORYLINE__", shot_uri("sms-7-calendar-storyline-390.png"))
             .replace("__SHOT_HEAD_A__", shot_uri("sms-5-headline-a-nextgame.png"))
             .replace("__SHOT_HEAD_B__", shot_uri("sms-5-headline-b-countdown.png"))
             .replace("__SHOT_CHROME_BEFORE__", shot_uri("sms-4-chrome-before.png"))
