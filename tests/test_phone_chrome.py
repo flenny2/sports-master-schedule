@@ -129,3 +129,33 @@ def test_named_controls_reach_the_tap_minimum(selector):
 def _px_at_least(value, floor):
     m = re.match(r"\s*(\d+)px\s*$", value)
     return bool(m) and int(m.group(1)) >= floor
+
+
+def test_banner_card_wraps_long_team_names_instead_of_cutting_them():
+    """Measured at 390px on 2026-07-27: the headline game read "CAROLINA
+    PANTHE…" because the banner's team name was 6px too wide.
+
+    The fix is a wrap, not a smaller font — buying back six pixels would
+    have fixed that one name and still failed on "Wolverhampton Wanderers".
+    This pins the wrap so a future tidy-up cannot quietly restore `nowrap`,
+    which would look identical on every short name and only break on the
+    long ones.
+    """
+    m = re.search(r"\.game-card--marquee \.up-name,\s*"
+                  r"\.game-card--marquee \.sb-name\s*\{([^}]*)\}", CSS)
+    assert m, "the banner's name-wrapping rule is gone"
+    decls = m.group(1)
+    assert "white-space: normal" in decls, (
+        "the banner name is back to nowrap; long names will be cut again"
+    )
+    assert "-webkit-line-clamp: 2" in decls, (
+        "without a line cap the banner card can grow without limit"
+    )
+
+
+def test_ordinary_cards_still_truncate_on_one_line():
+    """The wrap is deliberately banner-only. Ordinary cards are a list, and
+    an uneven list is harder to scan than a shortened name — so this pins
+    that the base rule was NOT changed along with the banner."""
+    assert "white-space: nowrap" in block(".up-team .up-name")
+    assert "white-space: nowrap" in block(".sb-name")
