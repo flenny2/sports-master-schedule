@@ -106,17 +106,22 @@ def phone_height(selector):
 
 @pytest.mark.parametrize("selector", [".pill", ".nav-arrow", ".gc-watched",
                                       ".mini-more", ".refresh-btn", ".tab",
-                                      ".sl-chip"])
+                                      ".sl-chip", ".read-btn", ".read-refresh"])
 def test_named_controls_reach_the_tap_minimum(selector):
     """Every one of these measured under 44px at 390px on 2026-07-27, except
     `.tab`, which is here so a future tightening of the tab bar cannot
     quietly take the main navigation below the minimum.
 
-    `.sl-chip` is here for a different reason worth remembering: the live
-    pass could not see it at all, because no storyline was active that day
-    and the whole filter row rendered 0x0. A measurement harness only covers
-    what is on screen, so a static check earns its place for controls that
-    appear seasonally.
+    `.sl-chip`, `.read-btn` and `.read-refresh` are here for a different
+    reason worth remembering: a live pass could not see any of them. The
+    filter chip rendered 0x0 because no storyline was active that day, and
+    the two read buttons only exist inside an expanded card of an UPCOMING
+    soccer or NFL game — of which the off-season Calendar was showing none.
+    A measurement harness only covers what is on screen, so a static check
+    earns its place for controls that appear seasonally or behind a flow.
+
+    The read buttons matter more than their size suggests: both of them
+    SPEND. A mis-tap there costs money rather than a wasted second.
     """
     size = phone_height(selector)
     ok = "--tap-min" in size or _px_at_least(size, 44)

@@ -54,12 +54,34 @@ def _make_proxy(local_files):
         def log_message(self, *a):
             pass
 
+        def do_POST(self):
+            """Forward writes to the app.
+
+            Without this the base handler answers 501 and the request never
+            reaches Flask — and because the page's `fetch` resolves with a
+            response either way, the failure looks exactly like a server that
+            generated nothing. That cost a pass on 2026-07-27: the tactical
+            read reported "no sections after 500 polls" while the server had
+            never been asked. Any driver that exercises a write path needs
+            this, so it lives here rather than in one of them.
+            """
+            length = int(self.headers.get("Content-Length") or 0)
+            payload = self.rfile.read(length) if length else None
+            req = urllib.request.Request(
+                APP + self.path, data=payload, method="POST",
+                headers={"Content-Type":
+                         self.headers.get("Content-Type", "application/json")})
+            self._relay(req)
+
         def do_GET(self):
             path = urllib.parse.urlparse(self.path).path
             if path in local_files:
                 return super().do_GET()
+            self._relay(APP + self.path)
+
+        def _relay(self, target):
             try:
-                with urllib.request.urlopen(APP + self.path, timeout=120) as up:
+                with urllib.request.urlopen(target, timeout=120) as up:
                     body = up.read()
                     self.send_response(up.status)
                     self.send_header(
@@ -125,19 +147,26 @@ class Harness:
     def url(self, path):
         return f"http://127.0.0.1:{self.port}{path}"
 
-    def chrome(self, args, timeout=300):
-        """One headless run in a throwaway profile."""
+    def chrome(self, args, timeout=300, budget=45000):
+        """One headless run in a throwaway profile.
+
+        `budget` is Chrome's virtual clock allowance in ms. The default suits
+        a pass that loads one view and measures it; a driver that navigates
+        several months, waits on an ESPN fetch and then polls for a generated
+        result needs more, and gets a blank page rather than an error when it
+        runs out.
+        """
         with tempfile.TemporaryDirectory() as profile:
             cmd = [
                 CHROME, "--headless", "--disable-gpu", "--no-sandbox",
                 "--hide-scrollbars", "--user-data-dir=" + profile,
-                "--virtual-time-budget=45000",
+                "--virtual-time-budget=" + str(budget),
                 "--run-all-compositor-stages-before-draw",
             ] + args
             return subprocess.run(cmd, capture_output=True, text=True,
                                   timeout=timeout).stdout
 
-    def report(self, path, out_id="qa-out", height=2600):
+    def report(self, path, out_id="qa-out", height=2600, budget=45000):
         """Run the harness page and return the text it wrote into `out_id`.
 
         Returns None when the element is absent, which means the page did not
@@ -145,14 +174,14 @@ class Harness:
         worth telling apart in the caller.
         """
         dom = self.chrome([f"--window-size={WIDTH + 130},{height}",
-                           "--dump-dom", self.url(path)])
+                           "--dump-dom", self.url(path)], budget=budget)
         m = re.search(r'<pre id="%s"[^>]*>(.*?)</pre>' % re.escape(out_id),
                       dom, re.S)
         return htmlmod.unescape(m.group(1)).strip() if m else None
 
-    def shot(self, path, name, height=None):
+    def shot(self, path, name, height=None, budget=45000):
         """Screenshot the harness page; returns the repo-relative path."""
         target = os.path.join(SHOTS, name)
         self.chrome([f"--window-size={WIDTH + 130},{height or FOLD + 60}",
-                     "--screenshot=" + target, self.url(path)])
+                     "--screenshot=" + target, self.url(path)], budget=budget)
         return os.path.relpath(target, REPO)

@@ -1138,7 +1138,12 @@ header {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  min-height: 40px;
+  /* 44, not 40. Measured 2026-07-27 at 390px: 192x40. This is the button
+     that SPENDS — a mis-tap here is money, not a wasted second — and no
+     earlier phone sweep could see it, because it only exists inside an
+     expanded card of an upcoming soccer or NFL game and the off-season
+     Calendar had none on screen. */
+  min-height: var(--tap-min);
   padding: 0 18px;
   background: var(--gold);
   color: var(--ink);
@@ -1227,7 +1232,13 @@ header {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
-  padding: 4px 0;
+  /* Reach added around the words, not under them, so the underline stays
+     tight to the text. "Refresh read" deliberately re-spends, so it needs
+     the full tap target even though it is styled as a quiet link. */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0;
 }
 .read-refresh:hover { color: var(--ink); }
 

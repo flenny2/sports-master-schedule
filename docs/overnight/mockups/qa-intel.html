@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<!--
+  QA-INTEL — drives the tactical-read flow at a true phone width.
+
+  Why this one exists: this is the most expensive thing in the app. Pressing
+  the read button spends money on the Anthropic API, and it is the one
+  feature the whole hub is built around (brief D3). It has never been driven
+  on a phone. Whatever Dylan sees the first time he presses that button on
+  his handset is whatever it happens to look like.
+
+  It runs at $0. With no ANTHROPIC_API_KEY in the environment the server
+  returns canned sections in the SAME shape a real read has, so the entire
+  pipeline — button, background thread, polling, rendering — is exercised
+  without a single token spent. Setting the key is Dylan's step, not a
+  lane's.
+
+  Getting to the button takes real navigation: the read only appears on an
+  upcoming soccer or NFL game, and the loaded month is all finished World
+  Cup matches, so the harness pages the Calendar forward until it finds one.
+
+  Usage: qa-intel.html?w=390  (see tools/qa-phone-intel.py)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>qa-intel</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #B8C0CC; }
+  #stage { width: max-content; margin: 0 auto; background: #EEF1F5; }
+  iframe { display: block; border: 0; }
+  pre { font: 12px monospace; padding: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="stage"><iframe id="f" title="app under test"></iframe></div>
+<pre id="qa-out">running…</pre>
+
+<script>
+(function () {
+    var q = new URLSearchParams(location.search);
+    var W = parseInt(q.get("w") || "390", 10);
+    var SHOT = q.get("shot") === "1";
+    var MAX_MONTHS = 3;          /* how far forward to look for a fixture */
+
+    var out = document.getElementById("qa-out");
+    var f = document.getElementById("f");
+    f.style.width = W + "px";
+    f.style.height = "844px";
+
+    var fails = [], notes = [], gameId = null;
+    function check(name, ok, detail) {
+        (ok ? notes : fails).push((ok ? "PASS  " : "FAIL  ") + name + " — " + detail);
+    }
+    function finish() {
+        out.textContent = fails.concat(notes).join("\n") +
+            "\nDROVE GAME: " + (gameId || "(none)") + "\n" +
+            (fails.length ? "RESULT: " + fails.length + " FAILED" : "RESULT: ALL PASS");
+        document.title = fails.length ? "QA FAIL" : "QA PASS";
+    }
+    /* Counts TICKS, not wall-clock. The other harnesses use a Date.now()
+       deadline and that is fine for them; it is wrong here. Headless Chrome
+       runs on a virtual clock that races ahead whenever the page is idle, so
+       a "60 second" deadline can expire in a blink while the real HTTP
+       round-trips it is waiting on have not landed. That is exactly how the
+       first run of this pass reported "no read within 60s" against a server
+       that had in fact answered instantly. Ticks yield to the event loop the
+       same way but cannot be outrun by the clock. */
+    function waitFor(doc, sel, ticks, done) {
+        if (doc.querySelector(sel)) return done(true);
+        if (ticks <= 0) return done(false);
+        setTimeout(function () { waitFor(doc, sel, ticks - 1, done); }, 120);
+    }
+    function label(n) {
+        var cls = n.className ? "." + String(n.className).split(" ")[0] : n.tagName;
+        var txt = (n.textContent || "").trim().replace(/\s+/g, " ");
+        return cls + (txt ? ' "' + (txt.length > 30 ? txt.slice(0, 30) + "…" : txt) + '"' : "");
+    }
+    /* Same two-bucket scan the card pass uses: text cut with no ellipsis is
+       silently gone; text cut with one is announced but still unreadable. */
+    function scan(win, root, into) {
+        root.querySelectorAll("*").forEach(function (n) {
+            var over = n.scrollWidth - n.clientWidth;
+            if (over <= 1) return;
+            var cs = win.getComputedStyle(n);
+            if (cs.overflowX !== "hidden" && cs.overflowX !== "clip") return;
+            (cs.textOverflow === "ellipsis" ? into.ellipsis : into.silent)
+                .push(label(n) + " loses " + over + "px");
+        });
+    }
+
+    f.addEventListener("load", function () {
+        var doc = f.contentDocument;
+        var win = f.contentWindow;
+
+        waitFor(doc, ".month-grid", 250, function (ready) {
+            check("the calendar loaded", ready,
+                  ready ? "month grid drawn" : "timed out");
+            if (!ready) return finish();
+            hunt(doc, win, 0);
+        });
+    });
+
+    /* Page forward a month at a time until a card turns up that carries a
+       read button. `.read-btn` only exists on upcoming soccer/NFL games, so
+       its presence IS the condition — no need to reason about statuses. */
+    function hunt(doc, win, monthsTried) {
+        var card = firstIntelCard(doc);
+        if (card) return open(doc, win, card);
+        if (monthsTried >= MAX_MONTHS) {
+            check("found an upcoming game with a tactical read",
+                  false,
+                  "none within " + MAX_MONTHS + " months of the loaded window");
+            return finish();
+        }
+        doc.getElementById("btn-next").click();
+        setTimeout(function () {
+            waitFor(doc, ".game-card", 170, function () {
+                hunt(doc, win, monthsTried + 1);
+            });
+        }, 1200);
+    }
+
+    function firstIntelCard(doc) {
+        var cards = doc.querySelectorAll(".game-card");
+        for (var i = 0; i < cards.length; i++) {
+            /* The intel block is built lazily on first expand, so a closed
+               card cannot be inspected for it. Upcoming cards render the
+               `.upcoming` layout — that is the cheap pre-filter. */
+            if (cards[i].querySelector(".upcoming")) return cards[i];
+        }
+        return null;
+    }
+
+    function open(doc, win, card) {
+        gameId = card.dataset.gameId || "(no id)";
+        card.click();                                  /* expand + lazy-init */
+        /* Either state is legitimate and both are worth covering: a game
+           with no read yet shows `.read-btn`, and one whose read is already
+           cached shows the sections plus a "Refresh read" link instead. The
+           first version of this pass waited only for the button, so the
+           screenshot run — which came after the measuring run had already
+           generated a read — timed out against a perfectly healthy page. */
+        waitFor(doc, ".read-btn, .intel-read .read-h", 210, function (found) {
+            var cached = !doc.querySelector(".read-btn");
+            check("an upcoming game offers a tactical read", found,
+                  !found ? "expanded game " + gameId + " and found neither a "
+                           + "read button nor a cached read"
+                         : (cached ? "read already cached for game " + gameId
+                                   : "read button present on game " + gameId));
+            if (!found) return finish();
+            if (cached) return measure(doc, win);
+
+            /* The facts panel is the free half and loads on its own. */
+            waitFor(doc, ".intel-facts .fact-row, .intel-facts .intel-hint",
+                    210, function () {
+                var btn = doc.querySelector(".read-btn");
+                var r = btn.getBoundingClientRect();
+                check("the read button clears 44px", r.height >= 43.5,
+                      "read button " + r.width.toFixed(0) + "x" +
+                      r.height.toFixed(0));
+
+                btn.click();
+                /* Did the handler actually run? A synthetic .click() that
+                   silently does nothing looks identical to a server that
+                   never answered, and the two need different fixes. */
+                check("the click reached the button's handler",
+                      btn.disabled || btn.textContent.indexOf("Start") === 0,
+                      'button reads "' + btn.textContent + '", disabled=' +
+                      btn.disabled);
+                /* The server generates on a background thread and the page
+                   polls every 3s, so this waits on the RESULT, not a delay. */
+                waitFor(doc, ".intel-read .read-h", 500, function (done) {
+                    check("pressing the button produces a read", done,
+                          done ? "sections rendered"
+                               : "no sections after 500 polls — is the server "
+                                 + "generating? (dry-run needs no API key)");
+                    if (!done) return finish();
+                    measure(doc, win);
+                });
+            });
+        });
+    }
+
+    function measure(doc, win) {
+        var intel = doc.querySelector(".gd-intel");
+        var sections = doc.querySelectorAll(".intel-read .read-h");
+        check("the read has more than one section", sections.length > 1,
+              sections.length + " sections");
+
+        var loss = { silent: [], ellipsis: [] };
+        scan(win, intel, loss);
+        check("nothing in the intel panel is cut silently",
+              loss.silent.length === 0,
+              loss.silent.length === 0 ? "clean"
+                  : loss.silent.length + ": " + loss.silent.slice(0, 6).join(" · "));
+        check("truncated-with-ellipsis in the intel panel, for the record", true,
+              loss.ellipsis.length === 0 ? "none"
+                  : loss.ellipsis.length + ": " +
+                    loss.ellipsis.slice(0, 4).join(" · "));
+
+        /* Nothing may push the panel wider than the card that holds it. */
+        var card = intel.closest(".game-card");
+        var cr = card.getBoundingClientRect();
+        var spill = [];
+        intel.querySelectorAll("*").forEach(function (n) {
+            var r = n.getBoundingClientRect();
+            if (r.width < 1) return;
+            if (r.right > cr.right + 0.5 || r.left < cr.left - 0.5) {
+                spill.push(label(n));
+            }
+        });
+        check("nothing in the intel panel spills out of the card",
+              spill.length === 0,
+              spill.length === 0 ? "clean" : spill.slice(0, 4).join(" · "));
+
+        /* Prose in a 390px column: a body line much past ~45 characters of
+           actual rendered width means the column is wider than the card,
+           which the spill check would have caught — so what matters here is
+           the opposite failure, a line box so narrow it is unreadable. */
+        var narrow = [];
+        doc.querySelectorAll(".intel-read .read-p, .intel-read .read-ul li")
+           .forEach(function (n) {
+            var r = n.getBoundingClientRect();
+            if (r.width > 0 && r.width < 200) narrow.push(label(n) +
+                " only " + r.width.toFixed(0) + "px wide");
+        });
+        check("read text has a readable column width", narrow.length === 0,
+              narrow.length === 0 ? "all body text ≥200px wide"
+                  : narrow.slice(0, 3).join(" · "));
+
+        /* Every control the panel offers, not just the one we pressed. The
+           one that matters most is "Refresh read": it re-spends, so a
+           mis-tap there costs money rather than a wasted second. */
+        var small = [];
+        intel.querySelectorAll("button, a[href], textarea").forEach(function (n) {
+            var r = n.getBoundingClientRect();
+            if (r.width < 1 || r.height < 1) return;
+            if (r.height < 43.5) {
+                small.push(label(n) + " " + r.width.toFixed(0) + "x" +
+                           r.height.toFixed(0));
+            }
+        });
+        check("every control in the intel panel clears 44px",
+              small.length === 0,
+              small.length === 0 ? "all clear" : small.join(" · "));
+
+        if (SHOT) {
+            doc.querySelector(".gd-intel").scrollIntoView();
+            setTimeout(function () {
+                var h = Math.max(doc.documentElement.scrollHeight,
+                                 doc.body.scrollHeight);
+                f.style.height = Math.min(h, 2400) + "px";
+                finish();
+            }, 250);
+            return;
+        }
+        finish();
+    }
+
+    f.src = "/#week";
+})();
+</script>
+</body>
+</html>
