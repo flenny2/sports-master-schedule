@@ -127,16 +127,31 @@ TITLE_RACES = [
 #               (https://a.espncdn.com/i/leaguelogos/soccer/500/<id>.png).
 STORYLINES = [
     {
-        "id": "pl_title_race_25_26",
+        "id": "pl_title_race_26_27",
         "label": "PL Title Race",
-        "description": "Arsenal vs Man City for the 2025-26 Premier League title",
+        "description": "Arsenal vs Man City for the 2026-27 Premier League title",
         "active": True,
         "team_ids": ["359", "382"],  # Arsenal, Man City
         "leagues": ["eng.1"],
         "logo_url": "https://a.espncdn.com/i/leaguelogos/soccer/500/23.png",
-        # No start_date — past title-race fixtures are part of the story.
-        # end_date stops tagging after the season ends.
-        "end_date": "2026-05-31",
+        # This one HAS a start_date, unlike its 25-26 predecessor. That entry
+        # deliberately left it off so earlier fixtures in the same season
+        # counted as part of the story — safe then, because 25-26 was the only
+        # season the app had ever seen. It is not safe now: without a floor,
+        # every Arsenal and Man City match from LAST season would carry a
+        # "26-27 title race" chip the moment you scrolled the Calendar back.
+        # 1 June, not 1 August: this window is exactly complementary to its
+        # predecessor's (which ended 2026-05-31), so there is no gap and no
+        # overlap. A later floor would also have left the chip missing until
+        # August — `get_active_storylines` withholds a storyline whose
+        # start_date has not arrived, so the Calendar would still have had no
+        # filter, and the rollover checker would have called that "ok".
+        "start_date": "2026-06-01",
+        # end_date stops tagging after the season ends. ./tools/rollover-check
+        # reports this entry as STALE once that date passes, which is the whole
+        # reason its predecessor sat expired for two months without anyone
+        # noticing the Calendar had lost its storyline filter.
+        "end_date": "2027-05-31",
     },
 ]
 
@@ -172,8 +187,13 @@ PL_TOP_TEAMS = {
 NFL_PRIMETIME_NETWORKS = {"NBC", "Peacock", "ESPN", "ABC", "Prime Video", "Amazon", "Netflix"}
 
 # ── NBA settings ──────────────────────────────────────────────────
-# Show playoff games (season type 3) and nationally televised regular season.
-NBA_NATIONAL_NETWORKS = {"ESPN", "TNT", "ABC", "NBA TV", "Prime Video"}
+# `NBA_NATIONAL_NETWORKS` lived here and was deleted 2026-07-27. It had been
+# referenced by nothing since the brief-A1 revamp unplugged NBA, and its
+# comment still promised "nationally televised regular season" coverage that
+# no code path provided — doubly wrong, because the last live NBA rule was
+# playoff/play-in only (`fetch_nba_games`). If NBA is ever restored, re-wire
+# it deliberately rather than restoring the set on the strength of this note;
+# the git history has the old values.
 
 # ── League display names ──────────────────────────────────────────
 LEAGUE_NAMES = {

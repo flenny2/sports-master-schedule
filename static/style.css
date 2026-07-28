@@ -1288,7 +1288,11 @@ header {
   text-transform: uppercase;
 }
 .sl-chip {
-  min-height: 38px;
+  /* 44, not 38. SMS-4's phone pass could not see this control: no storyline
+     was active at the time, so the whole filter row was hidden and measured
+     0x0. Renewing the storyline is what made it appear — and it appeared
+     6px under the minimum. */
+  min-height: var(--tap-min);
   font-family: var(--f-body);
   font-weight: 700;
   font-size: 0.78rem;

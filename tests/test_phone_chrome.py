@@ -105,11 +105,19 @@ def phone_height(selector):
 
 
 @pytest.mark.parametrize("selector", [".pill", ".nav-arrow", ".gc-watched",
-                                      ".mini-more", ".refresh-btn", ".tab"])
+                                      ".mini-more", ".refresh-btn", ".tab",
+                                      ".sl-chip"])
 def test_named_controls_reach_the_tap_minimum(selector):
     """Every one of these measured under 44px at 390px on 2026-07-27, except
     `.tab`, which is here so a future tightening of the tab bar cannot
-    quietly take the main navigation below the minimum."""
+    quietly take the main navigation below the minimum.
+
+    `.sl-chip` is here for a different reason worth remembering: the live
+    pass could not see it at all, because no storyline was active that day
+    and the whole filter row rendered 0x0. A measurement harness only covers
+    what is on screen, so a static check earns its place for controls that
+    appear seasonally.
+    """
     size = phone_height(selector)
     ok = "--tap-min" in size or _px_at_least(size, 44)
     assert ok, (
