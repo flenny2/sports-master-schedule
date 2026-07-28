@@ -218,10 +218,25 @@ function setMobileWindowStart(dateKey) {
 }
 
 /** Look up a team's standings position from pre-fetched data */
-function findTeamStanding(teamId) {
+function findTeamStanding(teamId, leagueSlug) {
     if (!standingsData || !standingsData.length) return null;
     for (var i = 0; i < standingsData.length; i++) {
         var league = standingsData[i];
+        // The standing must come from THIS game's competition. Without the
+        // scope the first id match anywhere wins, which put "ARS: 1st in
+        // Champions League" on a Premier League fixture the moment the PL
+        // table was skipped. It also removes the id-collision trap: ESPN
+        // team ids are only unique within a sport, the same reason
+        // fetch_standings scopes its watched-row highlight.
+        if (leagueSlug && league.id !== leagueSlug) continue;
+        // Between seasons ESPN zeroes every stat and then sorts the table
+        // ALPHABETICALLY, so a "rank" is a position in a list of names, not
+        // a standing. `preseason` is the server's flag for that. Skipping
+        // the league is what makes the caller's row disappear rather than
+        // print "ARS: 2nd in Premier League" before a ball is kicked —
+        // measured live on 2026-07-27, Arsenal 2nd and Aston Villa 3rd,
+        // both on zero games played.
+        if (league.preseason) continue;
         for (var j = 0; j < league.groups.length; j++) {
             var group = league.groups[j];
             for (var k = 0; k < group.teams.length; k++) {
@@ -1630,8 +1645,8 @@ function buildCard(g) {
     }
 
     // Standings context
-    var homeStanding = findTeamStanding(g.home_team.id);
-    var awayStanding = findTeamStanding(g.away_team.id);
+    var homeStanding = findTeamStanding(g.home_team.id, g.league);
+    var awayStanding = findTeamStanding(g.away_team.id, g.league);
     if (homeStanding || awayStanding) {
         var parts2 = [];
         if (awayStanding) {
