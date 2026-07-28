@@ -11,7 +11,7 @@ rebuilt in place each pass from `docs/overnight/review-board.html`, so the URL i
 2026-07-26 and merged to `master` locally (`--no-ff`). STILL NOT PUSHED: push is a Render
 deploy and is his hand only.** SMS-4 onward are on `auto/lane-sms-jul27`, branched from
 that merge, and are **undecided**.
-**Suite:** 251 passed (`./tools/validate`), green at every commit. Baseline at the start of
+**Suite:** 252 passed (`./tools/validate`), green at every commit. Baseline at the start of
 the Jul-27 lane was 197.
 **Receipts:** every entry from SMS-4 on ends with a `RECEIPTS` line (run-law rule 14) so a
 read-only audit can verify this run without a live reviewer seat.
@@ -233,6 +233,28 @@ read-only audit can verify this run without a live reviewer seat.
 - **KEEP / DISCARD** —
 - **RECEIPTS** — suite 251 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · measured against the running app at a true 390px; desktop re-rendered at 1100px unchanged
 
+### SMS-9 — One card per story on the front page, not two
+
+- **WHAT** — The Storylines block on Home was showing two cards for the same
+  Premier League title race: the proper race card, and a second, thinner one
+  underneath it. Now just the one.
+- **WHY** — Renewing the storyline in SMS-7 is what made the second card appear.
+  The app already knew not to show both — but it worked out which competition a
+  storyline belonged to by looking through the games it had loaded, and right now
+  it has loaded no Premier League games at all, so it found nothing and skipped
+  nothing. It reads the setting directly now.
+- **WHERE** — `app/storylines.py` (the endpoint now sends each storyline's league)
+  and `static/app.js`. Commit `15e9474`. Verified against the running app at 390px:
+  one card where there were two. 251 → 252 tests.
+- **RISK** — The half that decides which card to hide is browser code, and this repo
+  has no way to test browser code without adding a new tool — which the lane rules
+  forbid. So the server half is covered by tests and the browser half is covered by
+  a screenshot. It also only bites when a storyline and a title race describe the
+  same competition, which is exactly your current setup, so if you change either one
+  this is worth a second look.
+- **KEEP / DISCARD** —
+- **RECEIPTS** — suite 252 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · duplicate confirmed gone against the running app at 390px
+
 ---
 
 ## Idea queue
@@ -245,10 +267,7 @@ read-only audit can verify this run without a live reviewer seat.
    **CYCLE 4, shipped as SMS-4. CLOSED.**
 4. ~~Game-card density at 390px~~ → **CYCLE 8, shipped as SMS-8.** Answer: ordinary
    cards lose nothing at 390px; only the banner did, and it now wraps.
-8. **Two cards for one story on the Front Page** — found while shipping SMS-8, not yet
-   fixed. The rail shows the title-race card AND a storyline card for the same Premier
-   League race. The dedupe exists but works out the storyline's league by scanning the
-   loaded games, and in the off-season none are loaded. Next cycle.
+8. ~~Two cards for one story on the Front Page~~ → **CYCLE 9, shipped as SMS-9.**
 5. ~~The season-rollover checklist goes stale silently every August~~ → **CYCLE 6,
    shipped as SMS-6.** The checklist is a command now, and the one real bug in it (the
    hardcoded 38-match season) is fixed. What it found is the next cycle's work.
@@ -355,11 +374,18 @@ read-only audit can verify this run without a live reviewer seat.
   Also extracted `tools/phone_harness.py`: three drivers had each pasted the same
   one-origin proxy and a fourth was about to; all three re-run green after.
   249 → 251 tests.
-- **FOUND, NOT YET FIXED (next cycle):** renewing the storyline in SMS-7 put **two
-  cards for the same story** on the Front Page rail — the title-race card and a
-  storyline card. The dedupe exists but derives the storyline's league by scanning the
-  LOADED games, and in the off-season no Premier League game is loaded, so it finds
-  nothing and skips nothing. Visible in `sms-5-headline-a-nextgame.png`.
+- **CYCLE 9 — the duplicate story card — SHIPPED `15e9474`.** Kept as its own cycle
+  rather than folded into 8, because it is independently keepable and because it was
+  SMS-7's fallout, not SMS-8's subject. The shape of the bug is the lesson: the dedupe
+  **derived** a storyline's league by scanning the loaded games, which is a correct
+  answer mid-season and no answer at all in the off-season, when the window holds no
+  Premier League fixture — so it found nothing, matched nothing, and skipped nothing.
+  Deriving from data that is *usually* there fails exactly when the page is emptiest,
+  which is also when it is most visible. It reads the configured `leagues` now, with
+  the game scan kept only as the fallback for a storyline that names none. Honest
+  limit recorded in the entry: the deciding half is browser code and this repo has no
+  JS runner, so the server half is tested and the browser half is a screenshot.
+  251 → 252 tests.
 - **Run status, 2026-07-27: OPEN-ENDED on Dylan's direct word** (lane-kickoffs rule 10) —
   finishing the chartered job is not the end. Ends only on his word here, a
   `STOP-THE-RUN` line at the top of this file, or a fence that needs him.

@@ -397,14 +397,16 @@ BOARD_HTML = """
 
   <header class="head">
     <div class="eyebrow">Sports hub · lane · Mon 27 Jul 2026</div>
-    <h1>Four to rule on,<br>one to deploy</h1>
+    <h1>Six to rule on,<br>one to deploy</h1>
     <p class="lede">
-      Four new things. Three are defects fixed, and you only have to say keep or discard:
-      <b>SMS-4</b>, the tab row was sliding up behind the iPhone clock as you scrolled and
-      a third of the things you can tap were smaller than a fingertip. <b>SMS-6</b>, the
-      list of settings that quietly go out of date every August is a command now instead
-      of a note, and the one real bug on it is fixed. <b>SMS-7</b>, the Calendar's
-      storyline filter expired on 31 May and has been missing for two months; it is back.
+      Six new things. Five are defects fixed, and you only have to say keep or discard:
+      the tab row was sliding up behind the iPhone clock as you scrolled and a third of
+      the things you can tap were too small (<b>SMS-4</b>) · the list of settings that
+      quietly go out of date every August is a command now instead of a note, and the
+      one real bug on it is fixed (<b>SMS-6</b>) · the Calendar's storyline filter
+      expired on 31 May and has been missing for two months (<b>SMS-7</b>) · the banner
+      card was cutting "CAROLINA PANTHERS" in half (<b>SMS-8</b>) · and Home was showing
+      two cards for the same story (<b>SMS-9</b>).
       One needs a real choice: <b>SMS-5</b>, the big banner at the top of Home draws
       nothing at all out of season, so here are two things that could fill it.
     </p>
@@ -419,7 +421,7 @@ BOARD_HTML = """
     <p><b>Three things, and they are separate.</b></p>
 
     <div class="opt">
-      <span class="opt-name">1 · Keep or discard SMS-4, SMS-6 and SMS-7</span>
+      <span class="opt-name">1 · Keep or discard SMS-4, 6, 7, 8 and 9</span>
       <span class="muted">Reply with the ID. The full case is below, with a picture of the
       before and after.</span>
     </div>
@@ -440,7 +442,7 @@ BOARD_HTML = """
       <br><br>
       <code class="cmd">git push origin master</code>
       <br>
-      SMS-4 through SMS-7 are <b>not</b> in that push — they sit on the branch
+      SMS-4 through SMS-9 are <b>not</b> in that push — they sit on the branch
       <code>auto/lane-sms-jul27</code> until you rule on them.
     </div>
   </section>
@@ -448,7 +450,7 @@ BOARD_HTML = """
   <section style="display:flex;flex-direction:column;gap:16px">
     <h2>The proposals</h2>
     <p class="muted">
-      Reply with IDs — "keep SMS-4, SMS-6, SMS-7; SMS-5 is B" — and the next session does exactly that.
+      Reply with IDs — "keep 4, 6, 7, 8, 9; SMS-5 is B" — and the next session does exactly that.
       IDs are never reused, so they stay valid forever.
     </p>
 
@@ -634,6 +636,74 @@ you    FANTASY_ROSTER
           asks you about it separately. If you want different teams it is two ids in
           one file. Deleting the NBA value is only awkward if NBA comes back, and a
           comment in its place says where the old values live.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
+      </dl>
+    </article>
+
+    <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-8</span>
+        <span class="prop-title">The big card wraps a long team name</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          On the banner card at the top of Home, "CAROLINA PANTHERS" was being cut to
+          "CAROLINA PANTHE…". It wraps onto two lines now and shows the whole name.
+          The ordinary cards in the Calendar list are unchanged, on purpose.
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          I measured every card the app draws at phone width, closed and opened:
+          <b>nothing is being cut</b> — 19 cards, zero losses. The one place text was
+          disappearing is the banner, where the team name is set larger. It was short
+          by six pixels.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          One rule in <code>static/style.css</code>, two tests, and a new measuring
+          tool. Commit <code>612fff0</code>. The wrapped banner is in the SMS-5 shots
+          below; an opened card at phone width is
+          <code>sms-8-card-expanded-390.png</code>.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          A two-line name makes the banner taller, and two teams with different name
+          lengths make it slightly lopsided. I chose wrapping over a smaller font
+          because six pixels would have fixed those two names and still failed on
+          something like "Wolverhampton Wanderers" — but if you would rather the
+          banner stayed one line at any cost, that is a one-line revert.
+        </dd></div>
+        <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
+      </dl>
+    </article>
+
+    <article class="prop">
+      <div class="prop-head">
+        <span class="prop-id">SMS-9</span>
+        <span class="prop-title">One card per story, not two</span>
+      </div>
+      <dl>
+        <div><dt>What</dt><dd>
+          The Storylines block on Home was showing two cards for the same Premier
+          League title race — the proper race card and a thinner duplicate under it.
+          Now just the one.
+        </dd></div>
+        <div><dt>Why</dt><dd>
+          Renewing the storyline in SMS-7 is what made the second card appear. The app
+          already knew not to show both, but it worked out which competition a
+          storyline belonged to by looking through the games it had loaded — and right
+          now it has loaded no Premier League games at all, so it found nothing and
+          skipped nothing. It reads the setting directly now.
+        </dd></div>
+        <div><dt>Where</dt><dd>
+          <code>app/storylines.py</code> and <code>static/app.js</code>. Commit
+          <code>15e9474</code>. Verified against the running app at 390px: one card
+          where there were two. 252 tests.
+        </dd></div>
+        <div class="risk"><dt>Risk</dt><dd>
+          The half that decides which card to hide is browser code, and this repo has
+          no way to test browser code without adding a new tool — which the lane rules
+          forbid. So the server half is covered by tests and the browser half by a
+          screenshot. It also only bites when a storyline and a title race describe the
+          same competition, which is exactly your current setup.
         </dd></div>
         <div class="verdict"><dt>Keep / discard</dt><dd>waiting on you</dd></div>
       </dl>
@@ -900,10 +970,10 @@ you    FANTASY_ROSTER
   </section>
 
   <footer class="foot">
-    <b>Branch</b> auto/lane-sms-jul27 (SMS-4 through SMS-7 — all undecided) · off master,
+    <b>Branch</b> auto/lane-sms-jul27 (SMS-4 through SMS-9 — all undecided) · off master,
     which carries SMS-1..3 merged and <b>never pushed</b><br>
     <b>Deploy</b> untouched — pushing this repo is a deploy and only ever your hand<br>
-    <b>Tests</b> 249 passing (./tools/validate) · was 197 at the start of this lane<br>
+    <b>Tests</b> 252 passing (./tools/validate) · was 197 at the start of this lane<br>
     <b>Measured</b> against the running app at a true 390px viewport — 71 tap targets,
     all four tabs, safe areas simulated at iPhone 15 values<br>
     <b>Full detail</b> docs/overnight/proposals/sms-ux.md
