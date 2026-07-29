@@ -1,3 +1,5 @@
+CLOSED 2026-07-29 (SMS-4..SMS-11) — every verdict stamped per ID (rule 13): 7 KEEP by the blanket, SMS-5 ruled B. Branch-only stands: merge/deploy are Dylan's, per the banked scope.
+
 STOP-THE-RUN 2026-07-27 22:27 PDT — Dylan's word by phone, relayed by the meta desk (charter rule 11). Finish the cycle you are in, stop clean at the boundary, mark STOPPING: run end, then file your wrap block to meta-fable-supervisor/close-outs/ per the standing ferry contract — he is sitting down to review the work now.
 
 # Proposals — lane `sms-ux` (Opus 5, night of 2026-07-26)
@@ -126,7 +128,7 @@ read-only audit can verify this run without a live reviewer seat.
   after a deploy. The taller chips also cost about 10 pixels of vertical space at the
   top of every screen, which is a real trade against a slightly larger target. And
   like SMS-2 and SMS-3 this is live code: keeping it means a deploy.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — → **KEEP** — Dylan 2026-07-29, «keep everything as boarded» (his keyboard in the review-run terminal; banked `7fab63f`). Stamped by the review run per rule 13.
 - **RECEIPTS** — suite 206 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · phone chrome measured live at 390px; desktop re-shot unchanged
 
 ### SMS-5 — Something to headline the Home page out of season, built twice
@@ -183,7 +185,7 @@ read-only audit can verify this run without a live reviewer seat.
   the old number was, which is written down at the code. And the checker is honest
   about its limits — it cannot tell a year-old title race from a current one, so it
   asks rather than guessing.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — → **KEEP** — Dylan 2026-07-29, «keep everything as boarded» (his keyboard in the review-run terminal; banked `7fab63f`). Stamped by the review run per rule 13.
 - **RECEIPTS** — suite 246 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · new tests verified to fail 15/17 against the old constant
 
 ### SMS-7 — The Calendar has its storyline filter back
@@ -210,7 +212,7 @@ read-only audit can verify this run without a live reviewer seat.
   separately for that reason. If you want different teams, it is two ids in one file.
   Deleting the NBA setting is only awkward if NBA comes back, and a comment in its
   place says where the old values live. Live code: keeping it means a deploy.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — → **KEEP** — Dylan 2026-07-29, «keep everything as boarded» (his keyboard in the review-run terminal; banked `7fab63f`). Stamped by the review run per rule 13.
 - **RECEIPTS** — suite 249 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · both storyline tests verified to fail against the old config
 
 ### SMS-8 — The big card wraps a long team name instead of cutting it
@@ -232,7 +234,7 @@ read-only audit can verify this run without a live reviewer seat.
   on something like "Wolverhampton Wanderers" — but if you would rather the banner
   stayed one line at any cost, that is a one-line revert. Past two lines the "…"
   comes back, so the card cannot grow forever.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — → **KEEP** — Dylan 2026-07-29, «keep everything as boarded» (his keyboard in the review-run terminal; banked `7fab63f`). Stamped by the review run per rule 13.
 - **RECEIPTS** — suite 251 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · measured against the running app at a true 390px; desktop re-rendered at 1100px unchanged
 
 ### SMS-9 — One card per story on the front page, not two
@@ -254,7 +256,7 @@ read-only audit can verify this run without a live reviewer seat.
   a screenshot. It also only bites when a storyline and a title race describe the
   same competition, which is exactly your current setup, so if you change either one
   this is worth a second look.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — → **KEEP** — Dylan 2026-07-29, «keep everything as boarded» (his keyboard in the review-run terminal; banked `7fab63f`). Stamped by the review run per rule 13.
 - **RECEIPTS** — suite 252 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · duplicate confirmed gone against the running app at 390px
 
 ### SMS-10 — The button that spends money is now big enough to hit
@@ -281,7 +283,7 @@ read-only audit can verify this run without a live reviewer seat.
   call to make when you set the key. Three bugs in my own test rig had to be fixed
   before it worked at all, which is a fair warning that this flow is the least
   exercised part of the app.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — → **KEEP** — Dylan 2026-07-29, «keep everything as boarded» (his keyboard in the review-run terminal; banked `7fab63f`). Stamped by the review run per rule 13.
 - **RECEIPTS** — suite 254 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · driven at $0 in dry-run; the generated read was wiped from the user-data store afterwards
 
 ### SMS-11 — Cards stop claiming a league position before anyone has played
@@ -307,7 +309,7 @@ read-only audit can verify this run without a live reviewer seat.
   SMS-9, the gate lives in browser code and this repo has no way to test browser
   code without adding a tool the lane rules forbid — so it is verified by
   screenshots at both ends.
-- **KEEP / DISCARD** —
+- **KEEP / DISCARD** — → **KEEP** — Dylan 2026-07-29, «keep everything as boarded» (his keyboard in the review-run terminal; banked `7fab63f`). Stamped by the review run per rule 13.
 - **RECEIPTS** — suite 254 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · verified in both directions against the running app at 390px
 
 ---
