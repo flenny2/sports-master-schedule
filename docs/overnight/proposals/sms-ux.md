@@ -154,7 +154,7 @@ read-only audit can verify this run without a live reviewer seat.
   rather than a replacement — that is the part I would want your read on. Both are
   mockups: choosing one is then a real change to the page you open most, on a repo
   where shipping is a deploy.
-- **KEEP / DISCARD** — **DEFERRED, not declined** (Dylan by phone, 2026-07-27 ~20:30): *"I will wait"* — he wants a review sitting where he can see the two screenshots, because picking from titles would waste the work. Banked at the meta desk in `reports/dylan-rulings-jul27.md` under **Explicitly deferred — do NOT read as approval**. No verdict yet, so no `CLOSED` line; recorded here so nobody re-asks and nobody mistakes the silence for a keep.
+- **KEEP / DISCARD** — **RULED: B — the countdown board** (Dylan 2026-07-29, his words: «countdown board» = option B verbatim; the prior Jul-27 «I will wait» deferral is superseded — he ruled from the board's inline screenshots exactly as intended). **Build only is authorised**: mockup→real is a live-page change on a deploy-coupled repo, so it lands on a branch and SHIPPING stays his push, every time. Routed to the next sports working session. Stamped 2026-07-29 by the review run per rule 13.
 - **RECEIPTS** — suite 206 vs baseline 197 · **never pushed** (push here is a Render deploy) · branch-only, nothing merged to `master` · mockups only — no file the app loads was touched
 
 ### SMS-6 — The August checklist now runs itself, and one real bug in it is fixed
