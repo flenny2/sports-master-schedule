@@ -147,7 +147,13 @@ def test_get_active_storylines_filters_inactive(monkeypatch):
 
 
 def test_get_active_storylines_shape(monkeypatch):
-    """Response shape should expose id, label, description."""
+    """Response shape should expose id, label, description and leagues.
+
+    `leagues` is what lets the Front Page tell this storyline apart from a
+    title-race card covering the same competition. It is always present —
+    an empty list when the storyline names none — so the client never has to
+    distinguish "no leagues" from "an older server that did not send them".
+    """
     monkeypatch.setattr(config, "STORYLINES", [
         {
             "id": "pl", "label": "PL Title Race",
@@ -160,7 +166,20 @@ def test_get_active_storylines_shape(monkeypatch):
         "id": "pl",
         "label": "PL Title Race",
         "description": "Arsenal vs Man City",
+        "leagues": [],
     }]
+
+
+def test_get_active_storylines_carries_configured_leagues(monkeypatch):
+    """The Front Page dedupe used to derive this by scanning the loaded
+    games, which finds nothing in the off-season — no Premier League game is
+    in the window — so it silently stopped deduping and the rail showed two
+    cards for the same race."""
+    monkeypatch.setattr(config, "STORYLINES", [
+        {"id": "pl", "label": "PL", "active": True,
+         "team_ids": ["359"], "leagues": ["eng.1"]},
+    ])
+    assert get_active_storylines()[0]["leagues"] == ["eng.1"]
 
 
 def test_get_active_storylines_hides_expired_chip(monkeypatch):
@@ -202,3 +221,37 @@ def test_get_active_storylines_no_window_is_unbounded(monkeypatch):
          "team_ids": ["359"]},
     ])
     assert [s["id"] for s in get_active_storylines()] == ["always"]
+
+
+# ── The SHIPPED config, not a fixture ─────────────────────────────
+# Everything above tests the mechanism against stand-in storylines. These
+# two test the entry that actually ships, because the mechanism was never
+# the problem: the 25-26 entry sat expired from 31 May to 27 July and the
+# Calendar quietly had no storyline filter for two months.
+
+def test_shipped_storylines_are_season_scoped():
+    """Every shipped entry needs BOTH ends of its window.
+
+    `end_date` is what lets ./tools/rollover-check notice the entry has gone
+    stale — without it a dead storyline is indistinguishable from a live one.
+    `start_date` is what stops it reaching backwards: the 25-26 entry left it
+    off on the reasoning that earlier fixtures in the same season were part of
+    the story, which was true when 25-26 was the only season the app had ever
+    seen and false the moment a second one existed.
+    """
+    for s in config.STORYLINES:
+        assert s.get("start_date"), f"{s['id']} has no start_date"
+        assert s.get("end_date"), f"{s['id']} has no end_date"
+
+
+def test_shipped_storyline_does_not_reach_into_a_previous_season():
+    """The concrete regression: a title-race chip on last season's games.
+
+    Arsenal played Man City in the 2025-26 season. With the shipped config,
+    a game from that season must carry no storyline at all — otherwise
+    scrolling the Calendar back would show 26-27 title-race chips on matches
+    that decided a different title.
+    """
+    old = _game(game_id="last-season", home_id="359", away_id="382",
+                date_str="2026-03-15T19:00Z")
+    assert tag_storylines([old])[0]["storylines"] == []

@@ -54,6 +54,19 @@
   --r-chip: 8px;           /* chips + small buttons */
   --pad: 18px;             /* the ONE horizontal inset — everything aligns to it */
   --tap-min: 44px;
+
+  /* Phone safe areas. index.html asks for `viewport-fit=cover`, so on a
+     notched iPhone — and in every "Add to Home Screen" launch, where iOS
+     draws the status bar ON TOP of the page — the page really does extend
+     under the notch, the status bar and the home indicator. These four
+     tokens are what pays that back. They resolve to 0px on every device
+     without those cutouts, so nothing moves on a desktop or an older
+     phone. Named tokens rather than inline env() so tools/qa-phone-chrome.py
+     can override them and measure that the chrome actually responds. */
+  --sa-top:    env(safe-area-inset-top, 0px);
+  --sa-bottom: env(safe-area-inset-bottom, 0px);
+  --sa-left:   env(safe-area-inset-left, 0px);
+  --sa-right:  env(safe-area-inset-right, 0px);
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --shadow-card: 0 1px 2px rgba(12, 21, 34, 0.05),
                  0 10px 24px -18px rgba(12, 21, 34, 0.28);
@@ -72,6 +85,24 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  /* Landscape on a notched phone: the cutout eats one side. Insetting the
+     whole page here is one rule instead of thirty, and both values are 0px
+     in portrait, so the usual view is byte-for-byte unchanged. */
+  padding-left: var(--sa-left);
+  padding-right: var(--sa-right);
+}
+
+/* Status-bar backstop. The tab bar pins BELOW the notch (see .tab-bar), so
+   without this the strip above it would show cards sliding through the
+   cutout. Fixed, inert, and zero-height wherever there is no inset. */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--sa-top);
+  background: var(--page);
+  z-index: 50;              /* above the tab bar's 40 */
+  pointer-events: none;
 }
 
 main {
@@ -129,7 +160,7 @@ button { font-family: inherit; }
 header {
   position: relative;
   background: var(--page);
-  padding: 20px var(--pad) 14px;
+  padding: calc(20px + var(--sa-top)) var(--pad) 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -188,7 +219,10 @@ header {
 /* ── Tab bar — sticky across all views ──────────────────────────── */
 .tab-bar {
   position: sticky;
-  top: 0;
+  /* Pin below the notch, not under it — when the masthead has scrolled away
+     this bar is the topmost thing on screen, and at top:0 the tab labels
+     would sit behind the iOS clock in an Add-to-Home-Screen launch. */
+  top: var(--sa-top);
   z-index: 40;
   background: rgba(238, 241, 245, 0.92);
   backdrop-filter: blur(10px);
@@ -652,6 +686,9 @@ header {
   font-weight: 600;
   font-size: 0.78rem;
   cursor: pointer;
+  /* Padding, not height: the underline has to stay tight to the words, so
+     the extra 15px of reach is added around them instead of below. */
+  min-height: var(--tap-min);
   padding: 8px 0 6px;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -1009,7 +1046,7 @@ header {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
+  min-height: var(--tap-min);
   padding: 0 16px;
   background: var(--ink);
   color: #FFF;
@@ -1101,7 +1138,12 @@ header {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  min-height: 40px;
+  /* 44, not 40. Measured 2026-07-27 at 390px: 192x40. This is the button
+     that SPENDS — a mis-tap here is money, not a wasted second — and no
+     earlier phone sweep could see it, because it only exists inside an
+     expanded card of an upcoming soccer or NFL game and the off-season
+     Calendar had none on screen. */
+  min-height: var(--tap-min);
   padding: 0 18px;
   background: var(--gold);
   color: var(--ink);
@@ -1190,7 +1232,13 @@ header {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
-  padding: 4px 0;
+  /* Reach added around the words, not under them, so the underline stays
+     tight to the text. "Refresh read" deliberately re-spends, so it needs
+     the full tap target even though it is styled as a quiet link. */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0;
 }
 .read-refresh:hover { color: var(--ink); }
 
@@ -1251,7 +1299,11 @@ header {
   text-transform: uppercase;
 }
 .sl-chip {
-  min-height: 38px;
+  /* 44, not 38. SMS-4's phone pass could not see this control: no storyline
+     was active at the time, so the whole filter row was hidden and measured
+     0x0. Renewing the storyline is what made it appear — and it appeared
+     6px under the minimum. */
+  min-height: var(--tap-min);
   font-family: var(--f-body);
   font-weight: 700;
   font-size: 0.78rem;
@@ -2037,7 +2089,7 @@ header {
    ══════════════════════════════════════════════════════════════════ */
 footer {
   border-top: 1px solid var(--rule-hl);
-  padding: 20px var(--pad) 26px;
+  padding: 20px var(--pad) calc(26px + var(--sa-bottom));
   background: var(--page-2);
 }
 .legend {
@@ -2099,15 +2151,37 @@ footer {
 .game-card--marquee .rail { height: 8px; }
 .game-card--marquee { padding-top: 22px; }
 
+/* The banner card WRAPS a long team name instead of cutting it.
+   Measured 2026-07-27 at 390px: "Carolina Panthers" was 6px too wide and
+   "Arizona Cardinals" 3px, so the headline game read "CAROLINA PANTHE…".
+   Buying those pixels back with a smaller font or a tighter gap would have
+   fixed those two names and still failed on "Wolverhampton Wanderers" —
+   this is the class of problem, not two cases of it. The banner is the one
+   card with vertical room to spend, so it spends it. Two lines is the cap:
+   past that the ellipsis returns, which beats a card growing without limit.
+   Ordinary cards keep the single-line ellipsis — they are a list, and an
+   uneven list is harder to scan than a shortened name. */
+.game-card--marquee .up-name,
+.game-card--marquee .sb-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  line-height: 1.02;
+  overflow: hidden;
+}
+
 @media (max-width: 640px) {
-  header { padding: 14px var(--pad) 10px; }
+  header { padding: calc(14px + var(--sa-top)) var(--pad) 10px; }
   .brand { font-size: 1.45rem; }
   .tab { font-size: 0.9rem; min-height: 48px; }
   .sport-filters { padding: 8px var(--pad) 10px; }
-  .pill { min-height: 34px; padding: 0 13px; font-size: 0.78rem; }
+  /* 44px, not 34: these are the most-pressed controls on the phone and they
+     sit in a scrollable row, where a short chip invites a drag instead of a
+     tap. Text size stays small — the chip grows, the type does not. */
+  .pill { min-height: var(--tap-min); padding: 0 13px; font-size: 0.78rem; }
   #front-view { padding: 14px var(--pad) 32px; }
   .week-nav { padding: 12px var(--pad) 10px; }
-  .nav-arrow { width: 40px; min-height: 40px; }
   #week-label { font-size: 1.15rem; min-height: 40px; }
   .game-card { padding: 16px 15px 12px; }
   .gc-detail-inner { grid-template-columns: 1fr; gap: 12px; }
@@ -2124,7 +2198,7 @@ footer {
   .game-card--marquee .up-vs { padding-left: 59px; }
   #tables-view { padding: 14px 12px 30px; }
   .standings-table { font-size: 0.78rem; }
-  footer { padding: 16px 14px 22px; }
+  footer { padding: 16px 14px calc(22px + var(--sa-bottom)); }
 }
 
 /* Respect reduced-motion: kill pulses + lifts */

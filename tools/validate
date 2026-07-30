@@ -4,4 +4,18 @@
 set -e
 cd "$(dirname "$0")/.."
 python3 -m pytest -q
+
+# Season-rollover state, ADVISORY — it prints, it never fails the run.
+#
+# Deliberate: the things it catches are config choices (which storyline is
+# live, who is contending), and a red suite would block every future session
+# on a call only Dylan can make. But a checklist nobody runs is how the 25-26
+# storyline came to sit expired for two months, so it prints on every run.
+# `./tools/rollover-check` for the full report.
+python3 - <<'PY' || true
+import config
+from app import rollover
+print(rollover.summary(rollover.run_all(config)) + "  (./tools/rollover-check)")
+PY
+
 echo "VALIDATE PASS"

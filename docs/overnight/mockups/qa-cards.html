@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<!--
+  QA-CARDS — measures the REAL game cards at a true phone width.
+
+  The question this answers is "how much of a game card survives 390px", and
+  it is asked because a picture already suggested the answer: the SMS-5
+  banner shot showed "CAROLINA PANTHE…" where the small card fits "CAR".
+
+  The asserts are about LOST INFORMATION, not tidiness:
+
+    - text that is cut with no ellipsis — silently gone, and a screenshot
+      cannot show it because the missing words are outside the image;
+    - text cut WITH an ellipsis — deliberate, but still a fact you cannot
+      read on your phone, so it is counted and reported rather than passed
+      over;
+    - anything that spills outside its own card;
+    - the expanded state, reached through the app's own click handler,
+      because half a card's content only exists there.
+
+  Served through tools/qa-phone-cards.py, which proxies the app and this page
+  through one origin (Chrome clamps its window to 500px on Linux; reading
+  into the pinned iframe needs same origin).
+
+  Usage: qa-cards.html?w=390
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>qa-cards</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #B8C0CC; }
+  #stage { width: max-content; margin: 0 auto; background: #EEF1F5; }
+  iframe { display: block; border: 0; }
+  pre { font: 12px monospace; padding: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="stage"><iframe id="f" title="app under test"></iframe></div>
+<pre id="qa-out">running…</pre>
+
+<script>
+(function () {
+    var q = new URLSearchParams(location.search);
+    var W = parseInt(q.get("w") || "390", 10);
+    var EXPAND = q.get("expand") === "1";   /* shot mode: leave one card open */
+
+    var out = document.getElementById("qa-out");
+    var f = document.getElementById("f");
+    f.style.width = W + "px";
+    f.style.height = "844px";
+
+    var fails = [], notes = [];
+    function check(name, ok, detail) {
+        (ok ? notes : fails).push((ok ? "PASS  " : "FAIL  ") + name + " — " + detail);
+    }
+    function finish() {
+        out.textContent = fails.concat(notes).join("\n") + "\n" +
+            (fails.length ? "RESULT: " + fails.length + " FAILED" : "RESULT: ALL PASS");
+        document.title = fails.length ? "QA FAIL" : "QA PASS";
+    }
+    function waitFor(doc, sel, deadline, done) {
+        if (doc.querySelector(sel)) return done(true);
+        if (Date.now() > deadline) return done(false);
+        setTimeout(function () { waitFor(doc, sel, deadline, done); }, 100);
+    }
+
+    function label(n) {
+        var cls = n.className ? "." + String(n.className).split(" ")[0] : n.tagName;
+        var txt = (n.textContent || "").trim().replace(/\s+/g, " ");
+        return cls + (txt ? ' "' + (txt.length > 26 ? txt.slice(0, 26) + "…" : txt) + '"' : "");
+    }
+
+    /* Walk one card and classify every element that cannot show all of its
+       own text. `scrollWidth > clientWidth` is the measurement; the computed
+       text-overflow is what says whether the loss is announced. */
+    function scan(win, card, into) {
+        card.querySelectorAll("*").forEach(function (n) {
+            var over = n.scrollWidth - n.clientWidth;
+            if (over <= 1) return;
+            var cs = win.getComputedStyle(n);
+            if (cs.overflowX !== "hidden" && cs.overflowX !== "clip") return;
+            var bucket = cs.textOverflow === "ellipsis" ? into.ellipsis : into.silent;
+            bucket.push(label(n) + " loses " + over + "px");
+        });
+    }
+
+    f.addEventListener("load", function () {
+        var doc = f.contentDocument;
+        var win = f.contentWindow;
+
+        /* The Calendar is where the cards are: today has no games, so the
+           Home slate is empty and would measure nothing at all.
+
+           But the Calendar's own day list starts at TODAY, which in the
+           off-season is equally empty — waiting for `.game-card` straight
+           away just times out. So wait for the grid, then tap the first day
+           that the grid says has games, which is what a person would do. */
+        waitFor(doc, ".month-grid", Date.now() + 30000, function (gridReady) {
+            check("the calendar drew its month grid within 30s", gridReady,
+                  gridReady ? "found" : "timed out — is the app serving data?");
+            if (!gridReady) return finish();
+
+            /* `.mg-more` is the day's game count — it only renders when a
+               day has MORE than one game, which is exactly the day worth
+               measuring: a card list is densest where the day is busiest. */
+            var busiest = null, most = 0;
+            doc.querySelectorAll(".mg-cell").forEach(function (cell) {
+                var badge = cell.querySelector(".mg-more");
+                var n = badge ? parseInt(badge.textContent || "0", 10) : 0;
+                if (n > most) { most = n; busiest = cell; }
+            });
+            if (!busiest) {
+                check("the grid shows a day with games", false,
+                      "no day in this month has any — nothing to measure");
+                return finish();
+            }
+            busiest.click();
+
+            setTimeout(function () { measure(doc, win, most, busiest); }, 800);
+        });
+
+        function measure(doc, win, most, busiest) {
+            var ready = !!doc.querySelector(".game-card");
+            check("tapping the busiest day drew its cards", ready,
+                  ready ? "tapped " + busiest.getAttribute("aria-label") +
+                          " (" + most + " games)"
+                        : "tapped a day the grid said had " + most +
+                          " games and got no cards");
+            if (!ready) return finish();
+
+            check("viewport really is " + W + "px", win.innerWidth === W,
+                  "innerWidth " + win.innerWidth);
+
+            var cards = Array.prototype.slice.call(
+                doc.querySelectorAll(".game-card"));
+
+            /* ── 1. Collapsed cards ──────────────────────────────── */
+            var collapsed = { silent: [], ellipsis: [] };
+            cards.forEach(function (c) { scan(win, c, collapsed); });
+
+            check("no card cuts text without saying so",
+                  collapsed.silent.length === 0,
+                  collapsed.silent.length === 0
+                      ? "0 across " + cards.length + " cards"
+                      : collapsed.silent.length + ": " +
+                        collapsed.silent.slice(0, 6).join(" · "));
+
+            /* Ellipsis is deliberate, so this reports rather than fails —
+               but it is the density question itself: every one of these is
+               a fact on the card you cannot actually read at 390px. */
+            var uniq = {};
+            collapsed.ellipsis.forEach(function (e) {
+                var k = e.split(" ")[0];
+                uniq[k] = (uniq[k] || 0) + 1;
+            });
+            var kinds = Object.keys(uniq).map(function (k) {
+                return k + " ×" + uniq[k];
+            });
+            check("truncated-with-ellipsis, for the record", true,
+                  collapsed.ellipsis.length + " across " + cards.length +
+                  " cards" + (kinds.length ? " — " + kinds.join(", ") : ""));
+
+            /* ── 2. Nothing spills out of its own card ───────────── */
+            var spill = 0, worst = "";
+            cards.forEach(function (c) {
+                var cr = c.getBoundingClientRect();
+                c.querySelectorAll("*").forEach(function (n) {
+                    var r = n.getBoundingClientRect();
+                    if (r.width < 1) return;
+                    if (r.left < cr.left - 0.5 || r.right > cr.right + 0.5) {
+                        spill++;
+                        if (!worst) worst = label(n);
+                    }
+                });
+            });
+            check("nothing spills outside its card", spill === 0,
+                  spill === 0 ? "0 across " + cards.length + " cards"
+                              : spill + " spill, e.g. " + worst);
+
+            /* ── 3. The BANNER size ──────────────────────────────
+               The picture that started this pass was a marquee card, not a
+               normal one: `.game-card--marquee` scales the team name from
+               1.3rem to 1.55rem on a phone, and that is where "CAROLINA
+               PANTHERS" stopped fitting. There is no marquee on the page
+               today (no games), so build one the way the app does — its own
+               buildCard() with its own data — measure it, and take it out
+               again. Synthetic placement, real component. */
+            if (win.buildCard) {
+                /* Two layouts, not one, and that distinction is the whole
+                   finding. A finished game renders a SCOREBOARD (name beside
+                   a two-digit score); an upcoming one renders the UPCOMING
+                   layout, where the name shares its row with a kickoff time
+                   like "5:00 PM PT". Far less room for the name. Measuring
+                   whichever game came first would have answered the easy
+                   question — the loaded July window is all finished World
+                   Cup matches. */
+                var pool = (win.allGames || []).slice();
+                if (win.nextBeyondWindow) pool.push(win.nextBeyondWindow);
+
+                [["finished", "post"], ["upcoming", "pre"]].forEach(function (pair) {
+                    var kind = pair[0], status = pair[1];
+                    var worst = null, worstLen = -1;
+                    pool.forEach(function (g) {
+                        if (g.status !== status) return;
+                        var n = Math.max((g.home_team.name || "").length,
+                                         (g.away_team.name || "").length);
+                        if (n > worstLen) { worstLen = n; worst = g; }
+                    });
+                    if (!worst) {
+                        check("BANNER size, " + kind + " layout", true,
+                              "no " + kind + " game in the loaded data to measure");
+                        return;
+                    }
+                    var probe = win.buildCard(worst);
+                    probe.classList.add("game-card--marquee");
+                    cards[0].parentNode.insertBefore(probe, cards[0]);
+                    var banner = { silent: [], ellipsis: [] };
+                    scan(win, probe, banner);
+                    var lost = banner.ellipsis.concat(banner.silent);
+                    check("BANNER size, " + kind + " layout",
+                          lost.length === 0,
+                          worst.away_team.name + " at " + worst.home_team.name +
+                          " — " + (lost.length === 0
+                              ? "fits at 390px"
+                              : lost.length + " truncated: " + lost.join(" · ")));
+                    probe.remove();
+                });
+            }
+
+            /* ── 4. The expanded state ───────────────────────────
+               Half a card's content only exists once it is open, and the
+               app opens it on a body click — so click it the way a thumb
+               would rather than adding the class by hand. */
+            var target = cards[0];
+            target.click();
+
+            setTimeout(function () {
+                var open = target.classList.contains("expanded");
+                check("a card opens when you tap it", open,
+                      open ? "first card expanded" : "click did not expand it");
+                if (!open) return finish();
+
+                var exp = { silent: [], ellipsis: [] };
+                scan(win, target, exp);
+                check("the expanded card cuts nothing silently",
+                      exp.silent.length === 0,
+                      exp.silent.length === 0 ? "clean"
+                          : exp.silent.length + ": " +
+                            exp.silent.slice(0, 6).join(" · "));
+
+                /* Every control inside an open card has to be tappable —
+                   these are the ones a 44px sweep of the closed page can
+                   never see. */
+                var small = [];
+                target.querySelectorAll("button, textarea, a[href]")
+                      .forEach(function (n) {
+                    var r = n.getBoundingClientRect();
+                    if (r.width < 1 || r.height < 1) return;
+                    if (r.height < 43.5) {
+                        small.push(label(n) + " " + r.width.toFixed(0) + "x" +
+                                   r.height.toFixed(0));
+                    }
+                });
+                check("controls inside an open card clear 44px",
+                      small.length === 0,
+                      small.length === 0 ? "all clear" : small.join(" · "));
+
+                if (EXPAND) {
+                    /* Shot mode. The iframe is pinned at fold height, so a
+                       screenshot otherwise shows the month grid and none of
+                       the open card 900px below it. Grow the frame to the
+                       page and scroll the card into view. */
+                    target.scrollIntoView();
+                    setTimeout(function () {
+                        var h = Math.max(doc.documentElement.scrollHeight,
+                                         doc.body.scrollHeight);
+                        f.style.height = Math.min(h, 2400) + "px";
+                        finish();
+                    }, 200);
+                    return;
+                }
+                target.click();
+                finish();
+            }, 600);
+        }
+    });
+
+    f.src = "/#week";
+})();
+</script>
+</body>
+</html>

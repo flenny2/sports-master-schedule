@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<!--
+  HEADLINE VARIANTS — two answers to "what headlines the Home page when
+  there are no games today", built on top of the REAL app.
+
+  Why this is not a hand-built mockup like calendar-a/b: the question here
+  is "which of these two do you want", not "how does it feel to navigate",
+  and a picture answers it completely. So instead of re-drawing the front
+  page in a parallel stylesheet — which is how the calendar mockup ended up
+  with Sunday-first weekday headers the real app never had — each variant
+  is a TRANSFORMATION of the running app: real fonts, real tokens, real
+  card component, real ESPN data. What you see is what shipping it looks
+  like.
+
+  Served through tools/shoot-headline-mockups.py, which proxies the app and
+  this page through one origin (same trick as qa-chrome.html, and for the
+  same two reasons: Chrome clamps its window to 500px on Linux, and reading
+  into an iframe needs same origin).
+
+  Usage: headline-variants.html?w=390&v=a   (a = promote the next game,
+                                             b = season countdown board)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>headline-variants</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #B8C0CC; }
+  #stage { width: max-content; margin: 0 auto; background: #EEF1F5; }
+  iframe { display: block; border: 0; }
+  pre { font: 12px monospace; padding: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="stage"><iframe id="f" title="app under test"></iframe></div>
+<pre id="qa-out">running…</pre>
+
+<script>
+(function () {
+    var q = new URLSearchParams(location.search);
+    var W = parseInt(q.get("w") || "390", 10);
+    var V = (q.get("v") || "a").toLowerCase();
+
+    var out = document.getElementById("qa-out");
+    var f = document.getElementById("f");
+    f.style.width = W + "px";
+    f.style.height = "844px";
+
+    function say(msg, ok) {
+        out.textContent = msg;
+        document.title = ok ? "VARIANT " + V.toUpperCase() : "VARIANT FAILED";
+    }
+
+    function waitFor(doc, sel, deadline, done) {
+        if (doc.querySelector(sel)) return done(true);
+        if (Date.now() > deadline) return done(false);
+        setTimeout(function () { waitFor(doc, sel, deadline, done); }, 100);
+    }
+
+    f.addEventListener("load", function () {
+        var doc = f.contentDocument;
+        var win = f.contentWindow;
+
+        /* Wait for the "next up" card, not merely the slate. Both variants
+           exist only for the state where there are no games today but there
+           IS a next fixture, and that card appearing is exactly that state.
+           Waiting on `.fp-slate` instead raced the schedule fetch and made
+           variant A fail on a cold cache while variant B passed on a warm
+           one — same page, same code, different second. */
+        waitFor(doc, ".fp-next", Date.now() + 30000, function (ready) {
+            if (!ready) {
+                return say("no 'next up' card appeared within 30s — either "
+                           + "there are games today, or the schedule fetch "
+                           + "did not finish", false);
+            }
+
+            /* The app's builders are true globals on its window, so the
+               variants call the SAME code the page uses rather than a
+               look-alike. If that ever stops being true, this fails loudly
+               instead of quietly drawing something the app cannot. */
+            if (!win.buildCard || !win.el) {
+                return say("the app's builders are not reachable — did app.js "
+                           + "move inside a closure?", false);
+            }
+
+            var next = win.nextBeyondWindow ||
+                       (win.findNextGame && win.findNextGame(win.allGames));
+            if (!next) {
+                return say("no upcoming fixture in the loaded window — this "
+                           + "variant has nothing to headline", false);
+            }
+
+            var colMain = doc.querySelector(".fp-col-main");
+            var slate = doc.querySelector(".fp-slate");
+            var strip = doc.querySelector(".fp-myteams-strip");
+            var anchor = strip ? strip.parentNode.nextSibling : slate;
+
+            if (V === "a") variantA(doc, win, colMain, slate, anchor, next);
+            else variantB(doc, win, colMain, slate, anchor);
+
+            /* Height is set after the transformation so the shot captures
+               the whole page rather than the fold. */
+            setTimeout(function () {
+                var h = Math.max(doc.documentElement.scrollHeight,
+                                 doc.body.scrollHeight);
+                f.style.height = h + "px";
+                say("variant " + V + " · viewport " + win.innerWidth +
+                    "px · page " + h + "px", true);
+            }, 300);
+        });
+    });
+
+    /* ── A · The next game IS the main event ───────────────────────────
+       The headline slot never goes empty: out of season it carries the
+       next fixture at full marquee size, with the countdown under it. The
+       small "next up" card SMS-2 added to the slate is removed, because
+       two cards for one game reads as a bug. */
+    function variantA(doc, win, colMain, slate, anchor, next) {
+        var hero = win.el("div", "fp-block fp-hero");
+        hero.appendChild(win.el("span", "sec-tag", "Next Up"));
+        var card = win.buildCard(next);
+        card.classList.add("game-card--marquee");
+        hero.appendChild(card);
+        hero.appendChild(win.el("div", "fp-hero-note",
+            "Kicks off in " + win.countdownText(next.date)));
+        colMain.insertBefore(hero, anchor);
+
+        var small = slate.querySelector(".fp-next");
+        if (small) {
+            small.parentNode.replaceChild(
+                win.el("div", "dp-empty", "Nothing else on until then."),
+                small);
+        }
+    }
+
+    /* ── B · A countdown board instead of a game ───────────────────────
+       The honest read of an empty August is that no single fixture is the
+       main event — the story is that three seasons are about to start. So
+       the slot carries the openers, one row per competition, and the slate
+       keeps its "next up" card untouched. */
+    function variantB(doc, win, colMain, slate, anchor) {
+        var css = doc.createElement("style");
+        css.textContent = [
+            ".fp-openers{display:flex;flex-direction:column;gap:1px;",
+            "background:var(--rule-hl);border:1px solid var(--rule-hl);",
+            "border-radius:var(--r-card);overflow:hidden}",
+            ".fp-opener{display:grid;grid-template-columns:1fr auto;",
+            "align-items:center;gap:10px;background:var(--surface);",
+            "padding:14px 16px}",
+            ".fp-opener-name{font-family:var(--f-display);font-weight:700;",
+            "font-size:1.15rem;letter-spacing:.02em;text-transform:uppercase;",
+            "line-height:1.05}",
+            ".fp-opener-when{font-family:var(--f-mono);font-size:.68rem;",
+            "letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);",
+            "margin-top:3px}",
+            ".fp-opener-days{font-family:var(--f-display);font-weight:700;",
+            "font-size:2rem;line-height:.9;text-align:right}",
+            ".fp-opener-days small{display:block;font-family:var(--f-mono);",
+            "font-weight:400;font-size:.6rem;letter-spacing:.14em;",
+            "color:var(--ink-2)}"
+        ].join("");
+        doc.head.appendChild(css);
+
+        var block = win.el("div", "fp-block");
+        block.appendChild(win.el("span", "sec-tag", "The Countdown"));
+        var list = win.el("div", "fp-openers");
+        openers(win).forEach(function (o) {
+            var row = win.el("div", "fp-opener");
+            var left = win.el("div", "");
+            left.appendChild(win.el("div", "fp-opener-name", o.league));
+            left.appendChild(win.el("div", "fp-opener-when",
+                o.when + " · " + o.matchup));
+            row.appendChild(left);
+            var days = win.el("div", "fp-opener-days", String(o.days));
+            var unit = doc.createElement("small");
+            unit.textContent = o.days === 1 ? "day" : "days";
+            days.appendChild(unit);
+            row.appendChild(days);
+            list.appendChild(row);
+        });
+        block.appendChild(list);
+        colMain.insertBefore(block, anchor);
+    }
+
+    /* Earliest remaining fixture per competition.
+
+       Three sources, all of them data the Home page ALREADY has in hand —
+       which is the point: this board would need no new endpoint to ship.
+         - allGames: whatever is inside the loaded month (empty in August,
+           which is why the slot is empty in the first place);
+         - nextBeyondWindow: the one lookahead fixture SMS-2 added;
+         - the title race's `upcoming` list, which is how the page knows the
+           Premier League restarts on 21 August even though that date is
+           nowhere near the loaded window. */
+    function openers(win) {
+        var now = Date.now();
+        var best = {};
+
+        function offer(league, date, matchup) {
+            var t = new Date(date).getTime();
+            if (!(t > now)) return;
+            if (!best[league] || t < best[league].t) {
+                best[league] = { t: t, matchup: matchup };
+            }
+        }
+
+        (win.allGames || []).forEach(function (g) {
+            if (g.status !== "pre") return;
+            offer(g.league_name || g.sport, g.date,
+                  g.away_team.abbreviation + " at " + g.home_team.abbreviation);
+        });
+        if (win.nextBeyondWindow) {
+            var n = win.nextBeyondWindow;
+            offer(n.league_name || n.sport, n.date,
+                  n.away_team.abbreviation + " at " + n.home_team.abbreviation);
+        }
+        (win.titleRacesData || []).forEach(function (race) {
+            (race.contenders || []).forEach(function (c) {
+                var first = (c.upcoming || [])[0];
+                if (!first) return;
+                offer(race.league_name || race.label, first.date,
+                      c.team.abbr + (first.home ? " vs " : " at ") +
+                      first.opponent);
+            });
+        });
+
+        return Object.keys(best).map(function (k) {
+            var t = new Date(best[k].t);
+            return {
+                league: k,
+                days: Math.max(0, Math.ceil((best[k].t - now) / 86400000)),
+                when: t.toLocaleDateString("en-US",
+                    { weekday: "short", month: "short", day: "numeric" }),
+                matchup: best[k].matchup
+            };
+        }).sort(function (a, b) { return a.days - b.days; }).slice(0, 4);
+    }
+
+    f.src = "/#front";
+})();
+</script>
+</body>
+</html>
